@@ -123,7 +123,7 @@
     <p>This is the living handoff file for the project: what the app is trying to be, what is already working, what blocks deployment, and what path should get a real v1 onto phone and laptop with the least ceremony.</p>
     <div class="meta">
       <span class="pill">Updated: 2026-05-15</span>
-      <span class="pill">Repo: <code>habittracker</code></span>
+      <span class="pill">Repo: <code>C:\dev\personal\habittracker</code></span>
       <span class="pill">Primary goal: usable personal v1</span>
       <span class="pill">Primary constraint: Windows laptop</span>
     </div>
@@ -215,6 +215,9 @@
 
   <h2>Verification Log</h2>
   <ul>
+    <li><strong class="good">Repo relocated successfully</strong> from the OneDrive path to <code>C:\dev\personal\habittracker</code>. The original OneDrive copy was left untouched after the copy.</li>
+    <li><strong class="good">Expected repo folders verified</strong>: <code>web</code>, <code>shared</code>, <code>supabase</code>, <code>ios</code>, <code>docs</code>, <code>scripts</code>, <code>.git</code>, and <code>.github</code>.</li>
+    <li><strong class="good">Normal build path verified</strong>: from <code>C:\dev\personal\habittracker\web</code>, <code>npm install</code> and <code>npm run build</code> pass without the subst-drive workaround.</li>
     <li><strong class="good">Production web build passes</strong> when run through a subst drive to avoid the <code>&amp;</code> path issue.</li>
     <li><strong class="good">Lint now runs non-interactively</strong> after adding <code>web/.eslintrc.json</code>, and it currently reports no warnings or errors.</li>
     <li><strong class="warn">Normal <code>npm run build</code> from the OneDrive path fails</strong> because <code>Texas A&amp;M</code> is parsed by Windows command tooling. Use the subst approach or move the repo to a path without <code>&amp;</code>.</li>

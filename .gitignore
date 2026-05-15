@@ -1,0 +1,14 @@
+# Local secrets — never commit
+web/.env.local
+.env.local
+.env*.local
+ios/HabitTracker/Resources/SupabaseConfig.plist
+
+# Dependencies and build
+web/node_modules
+web/.next
+web/out
+
+# OS / editor
+.DS_Store
+Thumbs.db

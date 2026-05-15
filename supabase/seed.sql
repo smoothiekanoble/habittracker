@@ -1,0 +1,2 @@
+-- Optional seed data (e.g. for local dev). Requires auth.users rows; usually leave empty for MVP.
+-- No seed by default so RLS and schema can be tested with real auth.

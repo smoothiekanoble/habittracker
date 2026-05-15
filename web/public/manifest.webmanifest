@@ -1,0 +1,10 @@
+{
+  "name": "Habit Tracker",
+  "short_name": "Habits",
+  "description": "Low-friction habit tracking",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#18181b",
+  "orientation": "portrait-primary"
+}

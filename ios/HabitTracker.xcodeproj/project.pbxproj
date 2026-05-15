@@ -1,0 +1,593 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A1000001 /* HabitTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001 /* HabitTrackerApp.swift */; };
+		A1000002 /* Habit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002 /* Habit.swift */; };
+		A1000003 /* HabitLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000003 /* HabitLog.swift */; };
+		A1000004 /* WidgetPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000004 /* WidgetPayload.swift */; };
+		A1000005 /* WidgetPayloadBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000005 /* WidgetPayloadBuilder.swift */; };
+		A1000006 /* WidgetReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000006 /* WidgetReconciler.swift */; };
+		A1000007 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000007 /* TodayView.swift */; };
+		A1000008 /* HabitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000008 /* HabitDetailView.swift */; };
+		A1000009 /* HabitEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000009 /* HabitEditView.swift */; };
+		A100000A /* DotGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000A /* DotGridView.swift */; };
+		A1000011 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000012 /* SyncService.swift */; };
+		A1000013 /* SupabaseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000013 /* SupabaseConfig.swift */; };
+		B9000003 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B9000002 /* Supabase */; };
+		A100000B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A200000B /* Assets.xcassets */; };
+		A100000C /* WidgetPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000004 /* WidgetPayload.swift */; };
+		A100000D /* HabitWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000C /* HabitWidget.swift */; };
+		A100000E /* HabitWidgetExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000D /* HabitWidgetExtension.swift */; };
+		A100000F /* ToggleHabitIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000E /* ToggleHabitIntent.swift */; };
+		A1000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A200000F /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A3000001 /* HabitTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HabitTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3000002 /* HabitTrackerWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HabitTrackerWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000001 /* HabitTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitTrackerApp.swift; sourceTree = "<group>"; };
+		A2000002 /* Habit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Habit.swift; sourceTree = "<group>"; };
+		A2000003 /* HabitLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitLog.swift; sourceTree = "<group>"; };
+		A2000004 /* WidgetPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPayload.swift; sourceTree = "<group>"; };
+		A2000005 /* WidgetPayloadBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPayloadBuilder.swift; sourceTree = "<group>"; };
+		A2000006 /* WidgetReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetReconciler.swift; sourceTree = "<group>"; };
+		A2000007 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		A2000008 /* HabitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitDetailView.swift; sourceTree = "<group>"; };
+		A2000009 /* HabitEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitEditView.swift; sourceTree = "<group>"; };
+		A200000A /* DotGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DotGridView.swift; sourceTree = "<group>"; };
+		A2000012 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
+		A2000013 /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
+		A200000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A200000C /* HabitWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitWidget.swift; sourceTree = "<group>"; };
+		A200000D /* HabitWidgetExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitWidgetExtension.swift; sourceTree = "<group>"; };
+		A200000E /* ToggleHabitIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToggleHabitIntent.swift; sourceTree = "<group>"; };
+		A200000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A2000010 /* HabitTracker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HabitTracker.entitlements; sourceTree = "<group>"; };
+		A2000011 /* HabitTrackerWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HabitTrackerWidget.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A4000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B9000003 /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A4000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A5000001 = {
+			isa = PBXGroup;
+			children = (
+				A5000002 /* HabitTracker */,
+				A5000003 /* HabitTrackerWidget */,
+				A5000004 /* Shared */,
+				A5000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A5000002 /* HabitTracker */ = {
+			isa = PBXGroup;
+			children = (
+				A5000006 /* App */,
+				A5000007 /* Core */,
+				A5000008 /* Features */,
+				A5000009 /* Resources */,
+			);
+			path = HabitTracker;
+			sourceTree = "<group>";
+		};
+		A5000003 /* HabitTrackerWidget */ = {
+			isa = PBXGroup;
+			children = (
+				A200000C /* HabitWidget.swift */,
+				A200000D /* HabitWidgetExtension.swift */,
+				A500000A /* Intent */,
+				A200000F /* Assets.xcassets */,
+				A2000011 /* HabitTrackerWidget.entitlements */,
+			);
+			path = HabitTrackerWidget;
+			sourceTree = "<group>";
+		};
+		A5000004 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A2000004 /* WidgetPayload.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A5000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A3000001 /* HabitTracker.app */,
+				A3000002 /* HabitTrackerWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A5000006 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A2000001 /* HabitTrackerApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A5000007 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A500000B /* Models */,
+				A500000C /* WidgetPayload */,
+				A5000010 /* Sync */,
+				A5000011 /* Supabase */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A5000011 /* Supabase */ = {
+			isa = PBXGroup;
+			children = (
+				A2000013 /* SupabaseConfig.swift */,
+			);
+			path = Supabase;
+			sourceTree = "<group>";
+		};
+		A5000010 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				A2000012 /* SyncService.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		A5000008 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A500000D /* Today */,
+				A500000E /* Habits */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A5000009 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A200000B /* Assets.xcassets */,
+				A2000010 /* HabitTracker.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A500000A /* Intent */ = {
+			isa = PBXGroup;
+			children = (
+				A200000E /* ToggleHabitIntent.swift */,
+			);
+			path = Intent;
+			sourceTree = "<group>";
+		};
+		A500000B /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A2000002 /* Habit.swift */,
+				A2000003 /* HabitLog.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A500000C /* WidgetPayload */ = {
+			isa = PBXGroup;
+			children = (
+				A2000005 /* WidgetPayloadBuilder.swift */,
+				A2000006 /* WidgetReconciler.swift */,
+			);
+			path = WidgetPayload;
+			sourceTree = "<group>";
+		};
+		A500000D /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				A2000007 /* TodayView.swift */,
+			);
+			path = Today;
+			sourceTree = "<group>";
+		};
+		A500000E /* Habits */ = {
+			isa = PBXGroup;
+			children = (
+				A2000008 /* HabitDetailView.swift */,
+				A2000009 /* HabitEditView.swift */,
+				A200000A /* DotGridView.swift */,
+			);
+			path = Habits;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A6000001 /* HabitTracker */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A7000001 /* Build configuration list for PBXNativeTarget "HabitTracker" */;
+			buildPhases = (
+				A6000003 /* Sources */,
+				A4000001 /* Frameworks */,
+				A6000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HabitTracker;
+			packageProductDependencies = (
+				B9000002 /* Supabase */,
+			);
+			productName = HabitTracker;
+			productReference = A3000001 /* HabitTracker.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A6000002 /* HabitTrackerWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A7000002 /* Build configuration list for PBXNativeTarget "HabitTrackerWidgetExtension" */;
+			buildPhases = (
+				A6000005 /* Sources */,
+				A4000002 /* Frameworks */,
+				A6000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A6000007 /* PBXTargetDependency */,
+			);
+			name = HabitTrackerWidgetExtension;
+			productName = HabitTrackerWidgetExtension;
+			productReference = A3000002 /* HabitTrackerWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A8000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = A7000003 /* Build configuration list for PBXProject "HabitTracker" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A5000001;
+			packageReferences = (
+				B9000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			productRefGroup = A5000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A6000001 /* HabitTracker */,
+				A6000002 /* HabitTrackerWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A6000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000B /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000010 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A6000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000001 /* HabitTrackerApp.swift in Sources */,
+				A1000002 /* Habit.swift in Sources */,
+				A1000003 /* HabitLog.swift in Sources */,
+				A1000004 /* WidgetPayload.swift in Sources */,
+				A1000005 /* WidgetPayloadBuilder.swift in Sources */,
+				A1000006 /* WidgetReconciler.swift in Sources */,
+				A1000007 /* TodayView.swift in Sources */,
+				A1000008 /* HabitDetailView.swift in Sources */,
+				A1000009 /* HabitEditView.swift in Sources */,
+				A100000A /* DotGridView.swift in Sources */,
+				A1000011 /* SyncService.swift in Sources */,
+				A1000013 /* SupabaseConfig.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000C /* WidgetPayload.swift in Sources */,
+				A100000D /* HabitWidget.swift in Sources */,
+				A100000E /* HabitWidgetExtension.swift in Sources */,
+				A100000F /* ToggleHabitIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A6000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A6000001 /* HabitTracker */;
+			targetProxy = A6000008 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXContainerItemProxy section */
+		A6000008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A8000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A6000001;
+			remoteInfo = HabitTracker;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin XCBuildConfiguration section */
+		A9000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A9000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A9000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				CODE_SIGN_ENTITLEMENTS = HabitTracker/HabitTracker.entitlements;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.habittracker.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A9000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = HabitTracker/HabitTracker.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.habittracker.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A9000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HabitTrackerWidget/HabitTrackerWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Habit Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.habittracker.app.HabitTrackerWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A9000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HabitTrackerWidget/HabitTrackerWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Habit Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.habittracker.app.HabitTrackerWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A7000001 /* Build configuration list for PBXNativeTarget "HabitTracker" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A9000003 /* Debug */,
+				A9000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A7000002 /* Build configuration list for PBXNativeTarget "HabitTrackerWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A9000005 /* Debug */,
+				A9000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A7000003 /* Build configuration list for PBXProject "HabitTracker" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A9000001 /* Debug */,
+				A9000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B9000001 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B9000002 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B9000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A8000001 /* Project object */;
+}

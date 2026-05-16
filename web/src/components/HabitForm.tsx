@@ -103,7 +103,7 @@ export function HabitForm({
   }
 
   return (
-    <div className="max-w-lg mx-auto min-h-screen p-4">
+    <div className="mx-auto min-h-screen w-full max-w-lg overflow-x-hidden p-4">
       <header className="flex items-center justify-between py-4">
         <Link href="/habits" className="text-zinc-600">Cancel</Link>
         <h1 className="text-xl font-semibold">{mode === "create" ? "New habit" : "Edit habit"}</h1>
@@ -146,8 +146,8 @@ export function HabitForm({
             ))}
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+        <div className="grid w-full min-w-0 max-w-full gap-4 overflow-x-hidden sm:grid-cols-2">
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               Counts from
             </label>
@@ -155,13 +155,13 @@ export function HabitForm({
               type="date"
               value={activeFrom}
               onChange={(e) => setActiveFrom(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-zinc-300 min-h-[48px]"
+              className="habit-date-input"
             />
             <p className="text-xs text-zinc-500 mt-1">
               Only days on or after this count toward your calendar.
             </p>
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               Counts until (optional)
             </label>
@@ -169,7 +169,7 @@ export function HabitForm({
               type="date"
               value={activeUntil}
               onChange={(e) => setActiveUntil(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-zinc-300 min-h-[48px]"
+              className="habit-date-input"
             />
             <p className="text-xs text-zinc-500 mt-1">
               Leave empty for no end date.

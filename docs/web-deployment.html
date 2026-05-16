@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Habit Tracker Web Deployment Checklist</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18181b;
+      --muted: #52525b;
+      --line: #d4d4d8;
+      --paper: #fafafa;
+      --panel: #ffffff;
+      --good: #15803d;
+      --warn: #b45309;
+      --blue: #1d4ed8;
+    }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(980px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+    h1, h2, h3 { line-height: 1.15; margin: 0; }
+    h1 { font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: 0; }
+    h2 { font-size: 1.35rem; margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--line); }
+    p { color: var(--muted); margin: 10px 0 0; }
+    a { color: var(--blue); }
+    code {
+      background: #f4f4f5;
+      border: 1px solid #e4e4e7;
+      border-radius: 6px;
+      padding: 0.1rem 0.35rem;
+      font-size: 0.92em;
+    }
+    pre {
+      overflow-x: auto;
+      margin: 14px 0 0;
+      padding: 14px;
+      background: #18181b;
+      color: #fafafa;
+      border-radius: 8px;
+      line-height: 1.45;
+    }
+    pre code {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+    }
+    .hero {
+      display: grid;
+      gap: 12px;
+      padding: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card strong { display: block; margin-bottom: 6px; }
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    ol, ul { margin: 10px 0 0 1.25rem; color: var(--muted); }
+    li { margin: 7px 0; }
+    .note {
+      margin-top: 14px;
+      padding: 14px;
+      border-left: 4px solid var(--blue);
+      background: #eff6ff;
+      color: #1e3a8a;
+      border-radius: 6px;
+    }
+    .note p { color: inherit; margin: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>Web Deployment Checklist</h1>
+    <p>This is the v1 shipping path: deploy the Next.js app in <code>web/</code>, keep Supabase as the data store, and install the deployed site on iPhone from Safari with Add to Home Screen.</p>
+    <div class="meta">
+      <span class="pill">Updated: 2026-05-15</span>
+      <span class="pill">Target: Vercel</span>
+      <span class="pill">Repo root: <code>C:\dev\personal\habittracker</code></span>
+      <span class="pill">App root: <code>web</code></span>
+    </div>
+  </section>
+
+  <h2>Vercel Project</h2>
+  <ol>
+    <li>Import <code>git@github.com:smoothiekanoble/habittracker.git</code> into Vercel.</li>
+    <li>Set the Vercel project root directory to <code>web</code>.</li>
+    <li>Keep the detected framework as Next.js.</li>
+    <li>Use the default commands unless Vercel asks for them explicitly: install command <code>npm install</code>, build command <code>npm run build</code>, and framework-default output directory.</li>
+    <li>Add <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> for Production and Preview.</li>
+    <li>Do not set <code>NEXT_PUBLIC_AUTH_REDIRECT_ORIGIN</code> in Vercel unless intentionally forcing OAuth to a specific origin. It is only needed for local LAN testing, where the phone must return to the laptop's IP address.</li>
+  </ol>
+
+  <div class="note">
+    <p>The app depends on <code>@habittracker/shared</code> via <code>file:../shared</code>. With Vercel's monorepo root directory set to <code>web</code>, the repository checkout should still include <code>shared/</code>. If Vercel reports that <code>../shared</code> cannot be found, change the project root to the repository root and set the build command to <code>cd web &amp;&amp; npm install &amp;&amp; npm run build</code>.</p>
+  </div>
+
+  <h2>Windows CLI Note</h2>
+  <p>On this Windows machine, call the CLI as <code>vercel.cmd</code> instead of <code>vercel</code> if PowerShell blocks <code>vercel.ps1</code> because script execution is disabled.</p>
+
+  <h2>Supabase Auth URL Configuration</h2>
+  <p>In Supabase Dashboard -> Authentication -> URL Configuration:</p>
+  <ol>
+    <li>Set Site URL to the final production origin, for example <code>https://habittracker.example.com</code>.</li>
+    <li>Add the exact production callback URL: <code>https://habittracker.example.com/auth/callback</code>.</li>
+    <li>Keep local development allowed if you still test locally: <code>http://localhost:3000/auth/callback</code>, <code>http://127.0.0.1:3000/auth/callback</code>, and <code>http://&lt;PC_LAN_IP&gt;:3000/auth/callback</code> for iPhone-over-Wi-Fi testing.</li>
+    <li>For Vercel preview deployments, add a Vercel preview wildcard only if you plan to sign in on preview URLs: <code>https://*-&lt;team-or-account-slug&gt;.vercel.app/**</code>.</li>
+  </ol>
+  <p>Supabase recommends exact redirect paths for production. Wildcards are useful for previews and local development, but the production callback should be explicit.</p>
+
+  <h2>Google OAuth Provider</h2>
+  <p>In the Google Cloud OAuth client used by Supabase, make sure the authorized redirect URI is Supabase's OAuth callback URL, not the app's <code>/auth/callback</code> route:</p>
+  <pre><code>https://&lt;supabase-project-ref&gt;.supabase.co/auth/v1/callback</code></pre>
+  <p>Supabase receives Google's response there, then redirects the browser to the app callback URL from the allow list.</p>
+
+  <h2>Phone Install</h2>
+  <ol>
+    <li>Open the production site in Safari on iPhone.</li>
+    <li>Sign in with Google.</li>
+    <li>Use Share -> Add to Home Screen.</li>
+    <li>Launch from the home-screen icon and confirm today's toggle persists after closing and reopening.</li>
+  </ol>
+
+  <h2>Smoke Test</h2>
+  <p>Run this before and after deployment:</p>
+  <pre><code>cd C:\dev\personal\habittracker\web
+npm.cmd install
+npm.cmd run lint
+npm.cmd run build</code></pre>
+  <ol>
+    <li>Visit <code>/login</code>.</li>
+    <li>Complete Google sign-in.</li>
+    <li>Confirm the callback returns to <code>/</code>.</li>
+    <li>Create a habit.</li>
+    <li>Toggle it for today.</li>
+    <li>Open the same account on another device/browser and confirm the habit/log appears.</li>
+  </ol>
+
+  <h2>Reference Links</h2>
+  <ul>
+    <li><a href="https://vercel.com/docs/monorepos">Vercel: Using monorepos and Root Directory</a></li>
+    <li><a href="https://vercel.com/docs/environment-variables">Vercel: Environment variables</a></li>
+    <li><a href="https://supabase.com/docs/guides/auth/redirect-urls">Supabase: Redirect URLs</a></li>
+  </ul>
+</main>
+</body>
+</html>

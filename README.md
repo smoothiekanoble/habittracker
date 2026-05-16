@@ -22,6 +22,8 @@ No macOS or Xcode required. Run the app with Supabase as the backend:
 
    **Windows path with `&` (e.g. Texas A&M in the folder name):** Do **not** run `npm run dev` or `npm run dev:lan` from the long path — cmd breaks on `&`. From the **repo root** in PowerShell run `.\scripts\run-web-subst.ps1` (normal dev) or `.\scripts\run-web-subst.ps1 -Lan` (phone/LAN). See [Windows path workaround](docs/windows-path-workaround.md).
 
+4. **Deploy v1:** Use Vercel with root directory `web`, add the Supabase public URL and anon key, then update Supabase Auth redirect URLs for the production domain. See [Web deployment checklist](docs/web-deployment.html).
+
 ## Repo structure
 
 - **web/** — Next.js app (primary client)

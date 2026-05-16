@@ -209,20 +209,6 @@ export function HabitsListPage() {
           </ul>
         </>
       )}
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white p-2 flex gap-2 justify-center">
-        <Link
-          href="/"
-          className="px-4 py-2 rounded-lg text-zinc-600 text-sm font-medium hover:bg-zinc-100"
-        >
-          Today
-        </Link>
-        <Link
-          href="/habits"
-          className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium"
-        >
-          Habits
-        </Link>
-      </nav>
     </div>
   );
 }

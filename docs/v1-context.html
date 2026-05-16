@@ -140,8 +140,8 @@
       The SwiftUI app exists, but Windows cannot run Xcode/iOS tooling. More importantly, the iOS app has no Google sign-in UI yet, so Supabase sync is effectively dormant until native auth is wired.
     </div>
     <div class="card">
-      <strong class="bad">Main actual blockers found</strong>
-      The repo has no commits yet, Git reports dubious ownership under the current Windows account, and normal <code>npm</code> commands break from the <code>Texas A&amp;M</code> path unless the subst workaround is used.
+      <strong class="warn">Current deployment focus</strong>
+      The repo is now on <code>main</code>, pushed to GitHub, and builds from <code>C:\dev\personal\habittracker\web</code>. The remaining v1 work is deployment setup: Vercel project settings, Supabase env vars, and production Auth redirect URLs.
     </div>
   </div>
 
@@ -218,7 +218,7 @@
     <li><strong class="good">Repo relocated successfully</strong> from the OneDrive path to <code>C:\dev\personal\habittracker</code>. The original OneDrive copy was left untouched after the copy.</li>
     <li><strong class="good">Expected repo folders verified</strong>: <code>web</code>, <code>shared</code>, <code>supabase</code>, <code>ios</code>, <code>docs</code>, <code>scripts</code>, <code>.git</code>, and <code>.github</code>.</li>
     <li><strong class="good">Normal build path verified</strong>: from <code>C:\dev\personal\habittracker\web</code>, <code>npm install</code> and <code>npm run build</code> pass without the subst-drive workaround.</li>
-    <li><strong class="good">Production web build passes</strong> when run through a subst drive to avoid the <code>&amp;</code> path issue.</li>
+    <li><strong class="good">Repo pushed to GitHub</strong> at <code>git@github.com:smoothiekanoble/habittracker.git</code>; latest pushed commit is <code>9441cb6 Document repo relocation</code>.</li>
     <li><strong class="good">Lint now runs non-interactively</strong> after adding <code>web/.eslintrc.json</code>, and it currently reports no warnings or errors.</li>
     <li><strong class="warn">Normal <code>npm run build</code> from the OneDrive path fails</strong> because <code>Texas A&amp;M</code> is parsed by Windows command tooling. Use the subst approach or move the repo to a path without <code>&amp;</code>.</li>
     <li><strong class="warn"><code>npm.cmd install</code> reports an engine warning</strong> because local Node is <code>v22.12.0</code> and one lint dependency asks for <code>^22.13.0</code> or newer. It does not block install/build, but upgrading Node would remove the warning.</li>
@@ -230,20 +230,23 @@
     <li>Added <code>web/.eslintrc.json</code> so lint is a real command instead of an interactive prompt.</li>
     <li>Stabilized React hook dependencies in <code>TodayPage</code>, <code>HabitsListPage</code>, and <code>HabitExpandedMonthPanel</code>.</li>
     <li>Added this context file at <code>docs/v1-context.html</code>.</li>
+    <li>Added <code>docs/web-deployment.html</code> with the Vercel/Supabase deployment checklist.</li>
   </ul>
 
   <h2>Next Steps</h2>
   <ol>
-    <li>Decide the immediate deployment target for the web app, likely Vercel because this is a Next app and the setup is straightforward.</li>
-    <li>Commit the repo for the first time. Before that, decide whether to fix Git dubious ownership globally or keep using per-command <code>safe.directory</code>.</li>
-    <li>Create/connect a GitHub remote and push <code>main</code>.</li>
-    <li>Deploy the web app with <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> configured.</li>
-    <li>Update Supabase Auth URL configuration to include the production domain and <code>/auth/callback</code>.</li>
-    <li>Open the deployed URL on iPhone, sign in, then use Safari's Add to Home Screen for the phone app experience.</li>
+    <li>Create/import the Vercel project from <code>git@github.com:smoothiekanoble/habittracker.git</code> with root directory <code>web</code>.</li>
+    <li>Add <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to Vercel Production and Preview environments. Do not set <code>NEXT_PUBLIC_AUTH_REDIRECT_ORIGIN</code> in Vercel unless intentionally forcing one origin.</li>
+    <li>Deploy the web app and capture the production URL.</li>
+    <li>Update Supabase Auth URL configuration: production Site URL plus the exact production <code>/auth/callback</code> URL; add Vercel preview wildcards only if preview sign-in is needed.</li>
+    <li>Open the deployed URL on laptop and iPhone, sign in, create/toggle a habit, verify persistence across devices, then use Safari's Add to Home Screen for the phone app experience.</li>
   </ol>
 
   <h2>Reference Links</h2>
   <ul>
+    <li><a href="https://vercel.com/docs/monorepos">Vercel: Using monorepos and Root Directory</a></li>
+    <li><a href="https://vercel.com/docs/environment-variables">Vercel: Environment variables</a></li>
+    <li><a href="https://supabase.com/docs/guides/auth/redirect-urls">Supabase: Redirect URLs</a></li>
     <li><a href="https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds">Apple: Upload builds to App Store Connect</a></li>
     <li><a href="https://developer.apple.com/app-store-connect/">Apple: App Store Connect and TestFlight overview</a></li>
     <li><a href="https://developer.apple.com/support/compare-memberships/">Apple: Membership comparison and personal-team limits</a></li>

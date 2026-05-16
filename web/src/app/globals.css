@@ -80,9 +80,55 @@
   animation: today-habit-badge-pop 0.35s ease-out forwards;
 }
 
+.today-habit-list-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18px, black 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 18px, black 100%);
+}
+
+.today-habit-list-item {
+  contain: layout paint;
+}
+
+::view-transition-group(*) {
+  animation-duration: 0.32s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.habit-date-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #d4d4d8;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  padding: 0.75rem 1rem;
+  color: #18181b;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.habit-date-input::-webkit-date-and-time-value {
+  min-height: 1.4em;
+  text-align: left;
+}
+
+.habit-date-input::-webkit-calendar-picker-indicator {
+  margin: 0;
+  padding: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .today-habit-check-icon,
   .today-habit-badge {
     animation: none;
+  }
+
+  ::view-transition-group(*) {
+    animation-duration: 0.01ms;
   }
 }

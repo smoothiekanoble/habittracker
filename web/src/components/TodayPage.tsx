@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { TodayHabitRow } from "@/components/TodayHabitRow";
 import { TodayMonthBucketCalendar } from "@/components/TodayMonthBucketCalendar";
@@ -9,6 +10,10 @@ import { buildDailyCompletionMap, habitAppliesOnDate } from "@/lib/today-month-s
 import { createClient, type Habit, type HabitLog } from "@/lib/supabase";
 
 const todayDate = () => toLocalYMD(new Date());
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => { finished: Promise<void> };
+};
 
 function monthBounds(d: Date): { start: string; end: string } {
   const y = d.getFullYear();
@@ -49,6 +54,16 @@ export function TodayPage() {
       logs.filter((l) => ids.has(l.habit_id)).map((l) => l.habit_id)
     );
   }, [logs, habitsActiveToday]);
+
+  const pendingHabits = useMemo(
+    () => habitsActiveToday.filter((habit) => !completedIds.has(habit.id)),
+    [habitsActiveToday, completedIds]
+  );
+
+  const completedHabits = useMemo(
+    () => habitsActiveToday.filter((habit) => completedIds.has(habit.id)),
+    [habitsActiveToday, completedIds]
+  );
 
   const load = useCallback(async () => {
     try {
@@ -126,14 +141,25 @@ export function TodayPage() {
   async function toggle(habit: Habit) {
     const today = todayDate();
     const existing = logs.find((l) => l.habit_id === habit.id);
+    const updateWithTransition = (update: () => void) => {
+      const transition = (document as ViewTransitionDocument).startViewTransition;
+      if (transition) {
+        transition.call(document, () => flushSync(update));
+      } else {
+        update();
+      }
+    };
+
     if (existing) {
       const { error } = await supabase
         .from("habit_logs")
         .delete()
         .eq("id", existing.id);
       if (error) return;
-      setLogs((prev) => prev.filter((l) => l.id !== existing.id));
-      setMonthLogs((prev) => prev.filter((l) => l.id !== existing.id));
+      updateWithTransition(() => {
+        setLogs((prev) => prev.filter((l) => l.id !== existing.id));
+        setMonthLogs((prev) => prev.filter((l) => l.id !== existing.id));
+      });
     } else {
       const { data, error } = await supabase
         .from("habit_logs")
@@ -141,8 +167,10 @@ export function TodayPage() {
         .select()
         .single();
       if (error || !data) return;
-      setLogs((prev) => [...prev, data]);
-      setMonthLogs((prev) => [...prev, data]);
+      updateWithTransition(() => {
+        setLogs((prev) => [...prev, data]);
+        setMonthLogs((prev) => [...prev, data]);
+      });
     }
   }
 
@@ -181,23 +209,27 @@ export function TodayPage() {
           </aside>
 
           <div className="order-2 mx-auto w-full max-w-lg shrink-0 lg:mx-0 lg:ml-0">
-            <header className="flex items-center justify-between py-2 lg:py-4">
-              <h1 className="text-xl font-semibold">Today</h1>
-              <Link
-                href="/habits/new"
-                className="p-2 rounded-full bg-zinc-200 hover:bg-zinc-300 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                aria-label="Add habit"
-              >
-                +
-              </Link>
-            </header>
-            <p className="text-zinc-500 text-sm mb-4">
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              })}
-            </p>
+            <div className="sticky top-0 z-10 -mx-4 mb-4 bg-zinc-50/95 px-4 pb-4 pt-2 shadow-[0_16px_22px_-24px_rgba(24,24,27,0.55)] backdrop-blur sm:-mx-5 sm:px-5 lg:top-0 lg:py-4">
+              <header className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-xl font-semibold">Today</h1>
+                  <p className="mt-1 text-zinc-500 text-sm">
+                    {new Date().toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+                <Link
+                  href="/habits/new"
+                  className="p-2 rounded-full bg-zinc-200 hover:bg-zinc-300 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  aria-label="Add habit"
+                >
+                  +
+                </Link>
+              </header>
+            </div>
             {habits.length === 0 ? (
               <div className="text-center py-12 text-zinc-500">
                 <p>No habits yet.</p>
@@ -220,9 +252,13 @@ export function TodayPage() {
                 </p>
               </div>
             ) : (
-              <ul className="space-y-3">
-                {habitsActiveToday.map((habit) => (
-                  <li key={habit.id} className="list-none">
+              <ul className="today-habit-list-fade space-y-3">
+                {[...pendingHabits, ...completedHabits].map((habit) => (
+                  <li
+                    key={habit.id}
+                    className="today-habit-list-item list-none"
+                    style={{ viewTransitionName: `today-habit-${habit.id}` }}
+                  >
                     <TodayHabitRow
                       habit={habit}
                       completed={completedIds.has(habit.id)}
@@ -235,21 +271,6 @@ export function TodayPage() {
           </div>
         </div>
       </div>
-
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white p-2 flex gap-2 justify-center">
-        <Link
-          href="/"
-          className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium"
-        >
-          Today
-        </Link>
-        <Link
-          href="/habits"
-          className="px-4 py-2 rounded-lg text-zinc-600 text-sm font-medium hover:bg-zinc-100"
-        >
-          Habits
-        </Link>
-      </nav>
     </div>
   );
 }

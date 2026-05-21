@@ -30,12 +30,15 @@ export function TodayPage() {
   const [monthLogs, setMonthLogs] = useState<HabitLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const supabase = createClient();
 
-  const calendarNow = new Date();
-  const viewYear = calendarNow.getFullYear();
-  const viewMonthIndex = calendarNow.getMonth();
+  const viewYear = calendarMonth.getFullYear();
+  const viewMonthIndex = calendarMonth.getMonth();
   const todayStr = todayDate();
+  const todayMonth = new Date();
+  const isViewingCurrentMonth =
+    viewYear === todayMonth.getFullYear() && viewMonthIndex === todayMonth.getMonth();
 
   const statsByDate = useMemo(
     () =>
@@ -93,7 +96,7 @@ export function TodayPage() {
       const habitList = habitsData ?? [];
       setHabits(habitList);
       const today = todayDate();
-      const { start, end } = monthBounds(new Date());
+      const { start, end } = monthBounds(calendarMonth);
 
       if (habitList.length === 0) {
         setLogs([]);
@@ -115,12 +118,27 @@ export function TodayPage() {
         }
         const monthRows = monthData ?? [];
         setMonthLogs(monthRows);
-        setLogs(monthRows.filter((l) => l.date === today));
+        if (today >= start && today <= end) {
+          setLogs(monthRows.filter((l) => l.date === today));
+        } else {
+          const { data: todayData, error: todayError } = await supabase
+            .from("habit_logs")
+            .select("*")
+            .eq("completed", true)
+            .eq("date", today)
+            .in("habit_id", ids);
+          if (todayError) {
+            setLoadError(todayError.message);
+            setLogs([]);
+            return;
+          }
+          setLogs(todayData ?? []);
+        }
       }
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [calendarMonth, supabase]);
 
   useEffect(() => {
     load();
@@ -174,10 +192,33 @@ export function TodayPage() {
     }
   }
 
+  function previousCalendarMonth() {
+    setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
+  }
+
+  function nextCalendarMonth() {
+    setCalendarMonth((current) => {
+      const next = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+      const now = new Date();
+      if (
+        next.getFullYear() > now.getFullYear() ||
+        (next.getFullYear() === now.getFullYear() && next.getMonth() > now.getMonth())
+      ) {
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+      return next;
+    });
+  }
+
+  function jumpToCurrentCalendarMonth() {
+    const now = new Date();
+    setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">Loading...</p>
       </div>
     );
   }
@@ -190,7 +231,7 @@ export function TodayPage() {
             <p className="font-medium">Could not load habits</p>
             <p className="mt-1">{loadError}</p>
             <p className="mt-2 text-red-700">
-              If the table is missing, open Supabase → SQL Editor and run the files in{" "}
+              If the table is missing, open Supabase SQL Editor and run the files in{" "}
               <code className="bg-red-100 px-1 rounded">supabase/migrations/</code>.
             </p>
           </div>
@@ -204,6 +245,10 @@ export function TodayPage() {
                 monthIndex={viewMonthIndex}
                 statsByDate={statsByDate}
                 todayStr={todayStr}
+                canGoNext={!isViewingCurrentMonth}
+                onPrevMonth={previousCalendarMonth}
+                onNextMonth={nextCalendarMonth}
+                onThisMonth={jumpToCurrentCalendarMonth}
               />
             </div>
           </aside>

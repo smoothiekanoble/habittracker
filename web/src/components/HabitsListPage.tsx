@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import Link from "next/link";
+import { HabitIcon } from "@/components/HabitIcon";
 import { HabitExpandedMonthPanel } from "@/components/HabitExpandedMonthPanel";
 import { formatMonthYear } from "@/lib/calendar";
 import { createClient, type Habit } from "@/lib/supabase";
@@ -9,7 +11,6 @@ import { createClient, type Habit } from "@/lib/supabase";
 export function HabitsListPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
-  /** Habits in this set are collapsed; default empty = all calendars open. */
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonthIndex, setViewMonthIndex] = useState(() => new Date().getMonth());
@@ -95,7 +96,7 @@ export function HabitsListPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">Loading...</p>
       </div>
     );
   }
@@ -123,20 +124,20 @@ export function HabitsListPage() {
       ) : (
         <>
           <section
-            className="mb-3 rounded-2xl border border-zinc-200 bg-gradient-to-b from-white to-zinc-50/90 p-2 shadow-sm"
+            className="mb-3 rounded-xl border border-zinc-200 bg-gradient-to-b from-white to-zinc-50/90 p-2 shadow-sm"
             aria-label="Month for all habit calendars"
           >
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={globalPrevMonth}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-lg text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100"
                 aria-label="Previous month"
               >
-                ‹
+                &lsaquo;
               </button>
               <div className="min-w-0 flex-1 flex flex-col items-center justify-center py-1 text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
                   Month
                 </p>
                 <p className="text-sm font-semibold text-zinc-900 leading-tight">
@@ -155,20 +156,27 @@ export function HabitsListPage() {
               <button
                 type="button"
                 onClick={globalNextMonth}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-lg text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100"
                 aria-label="Next month"
               >
-                ›
+                &rsaquo;
               </button>
             </div>
           </section>
           <ul className="space-y-2">
             {habits.map((habit) => {
               const expanded = !collapsedIds.has(habit.id);
+              const accent = habit.color || "#6366f1";
               return (
                 <li
                   key={habit.id}
-                  className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden"
+                  className="overflow-hidden rounded-xl border shadow-sm"
+                  style={
+                    {
+                      borderColor: `color-mix(in srgb, ${accent} 22%, #e4e4e7)`,
+                      background: `linear-gradient(145deg, color-mix(in srgb, ${accent} 13%, white) 0%, white 58%, color-mix(in srgb, ${accent} 8%, white) 100%)`,
+                    } as CSSProperties
+                  }
                 >
                   <button
                     type="button"
@@ -176,16 +184,33 @@ export function HabitsListPage() {
                     aria-expanded={expanded}
                     aria-controls={`habit-panel-${habit.id}`}
                     onClick={() => toggleRow(habit.id)}
-                    className="flex w-full items-center gap-3 p-4 min-h-[44px] text-left rounded-t-xl hover:bg-zinc-50/80 active:bg-zinc-100 transition-colors"
+                    className="flex min-h-[56px] w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/45 active:bg-white/65"
                   >
                     <span
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0 pointer-events-none"
-                      style={{ backgroundColor: habit.color || "#6366f1" }}
+                      className="pointer-events-none flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+                      style={{
+                        backgroundColor: accent,
+                        boxShadow: `0 8px 18px -10px ${accent}`,
+                      }}
                     >
-                      •
+                      <HabitIcon icon={habit.icon} className="h-[18px] w-[18px]" />
                     </span>
-                    <span className="font-medium flex-1 min-w-0 pointer-events-none">
-                      {habit.title}
+                    <span className="pointer-events-none min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-zinc-900">
+                        {habit.title}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-medium text-zinc-500">
+                        {expanded ? "Hide history" : "Show history"}
+                      </span>
+                    </span>
+                    <span
+                      className={[
+                        "pointer-events-none text-lg leading-none text-zinc-500 transition-transform",
+                        expanded ? "rotate-90" : "",
+                      ].join(" ")}
+                      aria-hidden
+                    >
+                      &rsaquo;
                     </span>
                   </button>
                   {expanded && (
@@ -193,11 +218,14 @@ export function HabitsListPage() {
                       id={`habit-panel-${habit.id}`}
                       role="region"
                       aria-labelledby={`habit-trigger-${habit.id}`}
-                      className="habit-calendar-reveal-inner border-t border-zinc-100 bg-zinc-50/30"
+                      className="habit-calendar-reveal-inner border-t border-white/70 bg-white/40"
                     >
                       <HabitExpandedMonthPanel
                         habitId={habit.id}
-                        accentColor={habit.color || "#6366f1"}
+                        accentColor={accent}
+                        activeFrom={habit.active_from}
+                        activeUntil={habit.active_until}
+                        compact
                         viewYear={viewYear}
                         viewMonthIndex={viewMonthIndex}
                       />

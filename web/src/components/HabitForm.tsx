@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  HABIT_COLOR_PRESETS,
+  HABIT_ICON_PRESETS,
+  HabitIcon,
+  isPresetHabitIcon,
+} from "@/components/HabitIcon";
 import { HabitExpandedMonthPanel } from "@/components/HabitExpandedMonthPanel";
 import { toLocalYMD } from "@/lib/calendar";
 import { createClient, type Habit } from "@/lib/supabase";
-
-const COLORS = ["#6366f1", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899"];
-const ICONS = ["circle", "star", "heart", "bolt", "drop", "leaf"];
 
 export function HabitForm({
   mode,
@@ -19,8 +22,11 @@ export function HabitForm({
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(habit?.title ?? "");
-  const [color, setColor] = useState(habit?.color ?? "#6366f1");
+  const [color, setColor] = useState(habit?.color ?? "#4f46e5");
   const [icon, setIcon] = useState(habit?.icon ?? "circle");
+  const [customIcon, setCustomIcon] = useState(() =>
+    habit?.icon && !isPresetHabitIcon(habit.icon) ? habit.icon : ""
+  );
   const [activeFrom, setActiveFrom] = useState(() => {
     if (habit?.active_from) return habit.active_from.slice(0, 10);
     if (habit?.created_at) return toLocalYMD(new Date(habit.created_at));
@@ -31,6 +37,12 @@ export function HabitForm({
   );
   const [saving, setSaving] = useState(false);
   const supabase = createClient();
+  const customColorSelected = !HABIT_COLOR_PRESETS.some((preset) => preset === color);
+
+  useEffect(() => {
+    router.prefetch("/");
+    router.prefetch("/habits");
+  }, [router]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -70,7 +82,6 @@ export function HabitForm({
           return;
         }
         router.push("/");
-        router.refresh();
       } else if (habit) {
         const { error } = await supabase
           .from("habits")
@@ -106,7 +117,9 @@ export function HabitForm({
     <div className="mx-auto min-h-screen w-full max-w-lg overflow-x-hidden p-4">
       <header className="flex items-center justify-between py-4">
         <Link href="/habits" className="text-zinc-600">Cancel</Link>
-        <h1 className="text-xl font-semibold">{mode === "create" ? "New habit" : "Edit habit"}</h1>
+        <h1 className="text-xl font-semibold">
+          {mode === "create" ? "New habit" : "Edit habit"}
+        </h1>
         <button
           type="submit"
           form="habit-form"
@@ -130,20 +143,45 @@ export function HabitForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-zinc-700 mb-2">Color</label>
-          <div className="flex flex-wrap gap-2">
-            {COLORS.map((c) => (
+          <div className="flex flex-wrap items-center gap-2">
+            {HABIT_COLOR_PRESETS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setColor(c)}
-                className="w-10 h-10 rounded-full border-2 min-w-[44px] min-h-[44px]"
-                style={{
-                  backgroundColor: c,
-                  borderColor: color === c ? "#000" : "transparent",
-                }}
+                className="flex h-11 w-11 items-center justify-center rounded-full border-2 bg-white"
+                style={{ borderColor: color === c ? "#18181b" : "#e4e4e7" }}
                 aria-label={`Color ${c}`}
-              />
+              >
+                <span
+                  className="h-8 w-8 rounded-full shadow-sm"
+                  style={{ backgroundColor: c }}
+                  aria-hidden
+                />
+              </button>
             ))}
+            <label
+              className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-2 bg-white shadow-sm"
+              style={{ borderColor: customColorSelected ? "#18181b" : "#e4e4e7" }}
+              aria-label="Choose custom color"
+            >
+              <span
+                className="h-8 w-8 rounded-full shadow-sm"
+                style={{
+                  background:
+                    "conic-gradient(from 90deg, #ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444)",
+                }}
+                aria-hidden
+              />
+              <span className="absolute inset-[13px] rounded-full border border-white/90 bg-white/85 shadow-inner" aria-hidden />
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                aria-label="Choose custom color"
+              />
+            </label>
           </div>
         </div>
         <div className="grid w-full min-w-0 max-w-full gap-4 overflow-x-hidden sm:grid-cols-2">
@@ -179,21 +217,41 @@ export function HabitForm({
         <div>
           <label className="block text-sm font-medium text-zinc-700 mb-2">Icon</label>
           <div className="flex flex-wrap gap-2">
-            {ICONS.map((i) => (
+            {HABIT_ICON_PRESETS.map((preset) => (
               <button
-                key={i}
+                key={preset.id}
                 type="button"
-                onClick={() => setIcon(i)}
-                className="w-10 h-10 rounded-full flex items-center justify-center border-2 min-w-[44px] min-h-[44px]"
+                onClick={() => setIcon(preset.id)}
+                className="flex h-11 w-11 items-center justify-center rounded-full border-2 bg-white transition-colors"
                 style={{
-                  borderColor: icon === i ? "#000" : "#e4e4e7",
-                  color: habit?.color ?? color,
+                  borderColor: icon === preset.id ? "#18181b" : "#e4e4e7",
+                  color,
                 }}
-                aria-label={`Icon ${i}`}
+                aria-label={`Icon ${preset.label}`}
               >
-                {i === "circle" ? "○" : "•"}
+                <HabitIcon icon={preset.id} className="h-5 w-5" />
               </button>
             ))}
+            <label
+              className="flex h-11 min-w-[5.75rem] items-center gap-2 rounded-full border-2 bg-white px-3"
+              style={{ borderColor: !isPresetHabitIcon(icon) ? "#18181b" : "#e4e4e7" }}
+            >
+              <span className="text-xs font-semibold text-zinc-700" aria-hidden>
+                Custom
+              </span>
+              <input
+                type="text"
+                value={customIcon}
+                onChange={(e) => {
+                  const next = Array.from(e.target.value.trim()).slice(0, 2).join("");
+                  setCustomIcon(next);
+                  setIcon(next || "circle");
+                }}
+                className="w-8 bg-transparent text-center text-sm outline-none"
+                placeholder="+"
+                aria-label="Custom icon"
+              />
+            </label>
           </div>
         </div>
         {mode === "edit" && habit && (
@@ -202,12 +260,14 @@ export function HabitForm({
               <div className="px-3 pt-3 pb-1">
                 <h2 className="text-sm font-medium text-zinc-800">History</h2>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  Tap a day (today or earlier) to check or uncheck.
+                  Tap an active day (today or earlier) to check or uncheck.
                 </p>
               </div>
               <HabitExpandedMonthPanel
                 habitId={habit.id}
                 accentColor={color}
+                activeFrom={activeFrom}
+                activeUntil={activeUntil || null}
                 showEditLink={false}
                 editable
               />

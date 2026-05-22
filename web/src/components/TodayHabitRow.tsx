@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { HabitIcon } from "@/components/HabitIcon";
 import type { Habit } from "@/lib/supabase";
 
 type Props = {
@@ -71,13 +72,11 @@ export function TodayHabitRow({ habit, completed, onToggle }: Props) {
               <path d="M6 12.5l4 4 7.5-9.5" />
             </svg>
           ) : (
-            <span
+            <HabitIcon
               key="open"
-              className="text-[11px] font-medium text-zinc-400 transition-colors group-hover:text-zinc-500"
-              aria-hidden
-            >
-              {habit.icon === "circle" ? "" : "·"}
-            </span>
+              icon={habit.icon}
+              className="h-5 w-5 text-zinc-500 transition-colors group-hover:text-zinc-600"
+            />
           )}
         </div>
       </div>

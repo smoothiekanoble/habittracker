@@ -9,6 +9,8 @@ import { HabitMonthCalendar } from "@/components/HabitMonthCalendar";
 type Props = {
   habitId: string;
   accentColor: string;
+  activeFrom?: string | null;
+  activeUntil?: string | null;
   reloadNonce?: number;
   showEditLink?: boolean;
   /** Tap days on/before today to insert or delete habit_logs (edit screen). */
@@ -16,16 +18,20 @@ type Props = {
   /** When set, month is controlled by parent (no per-habit month arrows). */
   viewYear?: number;
   viewMonthIndex?: number;
+  compact?: boolean;
 };
 
 export function HabitExpandedMonthPanel({
   habitId,
   accentColor,
+  activeFrom,
+  activeUntil,
   reloadNonce = 0,
   showEditLink = true,
   editable = false,
   viewYear: viewYearProp,
   viewMonthIndex: viewMonthIndexProp,
+  compact = false,
 }: Props) {
   const now = new Date();
   const controlled =
@@ -72,6 +78,8 @@ export function HabitExpandedMonthPanel({
 
   async function toggleDate(dateStr: string) {
     if (!editable) return;
+    if (activeFrom && dateStr < activeFrom.slice(0, 10)) return;
+    if (activeUntil && dateStr > activeUntil.slice(0, 10)) return;
     if (togglingDates.current.has(dateStr)) return;
     togglingDates.current.add(dateStr);
     const wasDone = completedDates.has(dateStr);
@@ -137,13 +145,16 @@ export function HabitExpandedMonthPanel({
       }
     >
       {loading ? (
-        <p className="text-xs text-zinc-500 py-2 text-center">Loading…</p>
+        <p className="text-xs text-zinc-500 py-2 text-center">Loading...</p>
       ) : (
         <HabitMonthCalendar
           year={year}
           monthIndex={monthIndex}
           completedDates={completedDates}
           accentColor={accentColor}
+          activeFrom={activeFrom}
+          activeUntil={activeUntil}
+          compact={compact}
           showMonthNavigation={!controlled}
           onPrevMonth={prevMonth}
           onNextMonth={nextMonth}
@@ -156,7 +167,6 @@ export function HabitExpandedMonthPanel({
           <Link
             href={`/habits/${habitId}/edit`}
             className="text-xs text-indigo-600 font-medium hover:underline"
-            prefetch={false}
             onClick={(e) => e.stopPropagation()}
           >
             Edit habit

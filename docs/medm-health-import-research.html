@@ -1,0 +1,89 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MedM Health Body Weight Import Research</title>
+  <style>
+    :root { color-scheme: light; --ink: #1f201b; --muted: #666b5d; --line: #e2e4da; --panel: #fafaf4; --accent: #7a6419; --green: #28795f; }
+    body { margin: 0; font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: #fff; }
+    main { max-width: 920px; margin: 0 auto; padding: 44px 22px 72px; }
+    h1 { font-size: clamp(2rem, 5vw, 3.35rem); line-height: 1.05; margin: 0 0 12px; letter-spacing: 0; }
+    h2 { margin: 34px 0 10px; font-size: 1.35rem; }
+    h3 { margin: 22px 0 8px; font-size: 1.03rem; }
+    p { margin: 0 0 14px; }
+    a { color: var(--green); }
+    .lede { color: var(--muted); font-size: 1.08rem; max-width: 760px; }
+    .callout { margin: 22px 0; padding: 18px; border: 1px solid var(--line); border-left: 5px solid var(--green); background: var(--panel); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.95rem; }
+    th, td { text-align: left; vertical-align: top; padding: 11px 10px; border-bottom: 1px solid var(--line); }
+    th { background: #f2f3ea; font-weight: 700; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+    pre { overflow: auto; padding: 14px; background: #1b1b12; color: #f8f6e9; border-radius: 8px; }
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+    .meta { color: var(--muted); font-size: 0.92rem; margin-bottom: 28px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>MedM Health Body Weight Import Research</h1>
+  <p class="lede">Feasibility review for importing body-weight readings from MedM Health or a MedM-connected scale into Habit Tracker.</p>
+  <p class="meta">Prepared June 7, 2026. Worktree: <code>codex/medm-health-import</code>.</p>
+
+  <section class="callout">
+    <h2>Recommendation</h2>
+    <p>MedM body weight ingestion looks feasible for v1 through user-controlled file export, with Apple Health as the best iPhone source of truth if MedM sync is already enabled. Start with CSV/XLSX-style file import for weight readings and avoid undocumented cloud APIs.</p>
+  </section>
+
+  <h2>Options Considered</h2>
+  <table>
+    <thead><tr><th>Path</th><th>Fit for v1</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>MedM app export</td><td>Best practical first path</td><td>MedM describes Health Diary as supporting basic data export, PDF/XLSX reports for Premium, and export/sharing options. Source: <a href="https://www.medm.com/apps/health.html">MedM Health Diary</a>.</td></tr>
+      <tr><td>Apple Health sync</td><td>Best iPhone source of truth</td><td>The MedM manual says Apple Health sync supports Weight and that MedM exports Weight, BMI, lean body mass, and body fat percentage to Apple Health where supported. Source: <a href="https://www.medm.com/apps/user_manual.html">MedM Health user manual</a>.</td></tr>
+      <tr><td>Google Health Connect sync</td><td>Good Android path</td><td>MedM documents Health Connect support for Android and import/export of weight among other metrics. Useful if the source phone is Android, less central for this iPhone-first project.</td></tr>
+      <tr><td>MedM cloud/API</td><td>Not for personal v1</td><td>MedM has platform/cloud offerings, but this spike did not find a simple personal OAuth/API path for Habit Tracker. Treat any API work as a later vendor-integration project.</td></tr>
+      <tr><td>Manual entry</td><td>Acceptable fallback</td><td>If exports are annoying, body weight is low-frequency enough that manual entry remains viable.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Best Practical Path</h2>
+  <p>For the user’s current iPhone-first v1, make Apple Health the canonical phone-side health hub. Let MedM write weight to Apple Health when possible, then import a user-controlled export from Apple Health or from MedM’s own report/export flow. This avoids depending on MedM credentials inside Habit Tracker.</p>
+
+  <h2>Prototype</h2>
+  <p>This spike includes a synthetic CSV parser for weight readings:</p>
+  <pre>node scripts/medm-health/parse-medm-weight-csv.mjs scripts/medm-health/fixtures/synthetic-medm-weight.csv</pre>
+  <p>It emits normalized daily metric records:</p>
+  <pre>{ "date": "2026-06-01", "metric_type": "body_weight", "value": 181.8, "unit": "lb", "source": "medm_health", "source_detail": "synthetic_weight_csv 07:15" }</pre>
+
+  <h2>Data Fields Available</h2>
+  <p>For weight, MedM documents Body Mass / Weight plus body composition fields such as body fat percentage, BMI, muscle metrics, water metrics, basal metabolic rate, visceral fat, lean mass, and metabolic age. The first import should only support <code>body_weight</code>, then add BMI/body-fat once a real export format is inspected locally under <code>local-data/</code>.</p>
+
+  <h2>Manual User Steps</h2>
+  <ol>
+    <li>Pair the body-weight scale with MedM Health Diary or enter weight manually.</li>
+    <li>Enable Apple Health sync for Weight if using Apple Health as the hub.</li>
+    <li>Export a weight report/file from MedM or Apple Health.</li>
+    <li>Place the file under <code>local-data/imports/medm-health/</code>.</li>
+    <li>Run a local dry-run importer and review normalized rows before uploading.</li>
+  </ol>
+
+  <h2>Risks and Limitations</h2>
+  <ul>
+    <li>Actual MedM export headers need to be inspected with a real local file before final parser hardening.</li>
+    <li>Premium subscription may affect available report/export and ecosystem sync options.</li>
+    <li>Body composition fields vary by scale and may not map cleanly across Apple Health, MedM, and Habit Tracker.</li>
+    <li>Do not commit real weight exports; keep them under gitignored <code>local-data/</code>.</li>
+  </ul>
+
+  <h2>Next Implementation Steps</h2>
+  <ol>
+    <li>Collect one real MedM or Apple Health weight export locally under <code>local-data/</code>.</li>
+    <li>Adapt the parser to the actual headers while keeping the synthetic fixture in git.</li>
+    <li>Add dry-run validation: duplicate detection, units, impossible values, and date parsing.</li>
+    <li>Insert into shared daily metrics storage only after schema review.</li>
+  </ol>
+</main>
+</body>
+</html>

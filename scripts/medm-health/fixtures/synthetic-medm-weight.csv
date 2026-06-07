@@ -1,3 +1,5 @@
-﻿Date,Time,Weight,Unit,BMI,Body Fat %
-2026-06-01,07:15,181.8,lb,24.7,18.2
-2026-06-02,07:10,181.3,lb,24.6,18.1
+Record ID,Measurement Date,Measurement Time,Body Mass,Weight Unit,BMI,Body Fat %,Device Name,Export Source
+medm-synth-001,2026-06-01,07:15,181.8,lb,24.7,18.2,Synthetic Scale,MedM Health CSV
+medm-synth-002,2026-06-02,07:10,181.3 lbs,,24.6,18.1,Synthetic Scale,MedM Health CSV
+medm-synth-003,06/03/2026,07:05,82.1,kg,24.5,18.0,Synthetic Scale,MedM Health CSV
+medm-synth-004,04.06.2026,07:00,"81,9",kg,24.4,17.9,Synthetic Scale,MedM Health CSV

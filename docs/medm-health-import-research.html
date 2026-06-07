@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -49,13 +49,34 @@
   </table>
 
   <h2>Best Practical Path</h2>
-  <p>For the user’s current iPhone-first v1, make Apple Health the canonical phone-side health hub. Let MedM write weight to Apple Health when possible, then import a user-controlled export from Apple Health or from MedM’s own report/export flow. This avoids depending on MedM credentials inside Habit Tracker.</p>
+  <p>For the userâ€™s current iPhone-first v1, make Apple Health the canonical phone-side health hub. Let MedM write weight to Apple Health when possible, then import a user-controlled export from Apple Health or from MedMâ€™s own report/export flow. This avoids depending on MedM credentials inside Habit Tracker.</p>
 
   <h2>Prototype</h2>
   <p>This spike includes a synthetic CSV parser for weight readings:</p>
   <pre>node scripts/medm-health/parse-medm-weight-csv.mjs scripts/medm-health/fixtures/synthetic-medm-weight.csv</pre>
-  <p>It emits normalized daily metric records:</p>
-  <pre>{ "date": "2026-06-01", "metric_type": "body_weight", "value": 181.8, "unit": "lb", "source": "medm_health", "source_detail": "synthetic_weight_csv 07:15" }</pre>
+  <p>It emits source-specific adapter rows in the shared normalized metric shape:</p>
+  <pre>{
+  "date": "2026-06-01",
+  "metric_type": "body_weight",
+  "value": 181.8,
+  "unit": "lb",
+  "source": "medm_health",
+  "source_detail": "Synthetic Scale; MedM Health CSV; time 07:15",
+  "source_record_id": "medm-synth-001"
+}</pre>
+
+  <h2>Parser Contract</h2>
+  <p>The parser is adapter-only and performs no database writes. It accepts synthetic MedM-style CSV exports and emits JSON rows shaped as <code>{ date, metric_type, value, unit, source, source_detail?, source_record_id?, raw_hash? }</code>.</p>
+  <ul>
+    <li><code>metric_type</code> is always <code>body_weight</code>.</li>
+    <li><code>source</code> is always <code>medm_health</code>.</li>
+    <li><code>unit</code> is normalized to <code>lb</code> or <code>kg</code> from the unit column, value text, or weight header.</li>
+    <li><code>source_detail</code> combines available app, device, export source, and time details.</li>
+    <li><code>source_record_id</code> is used when an export row has an ID; otherwise <code>raw_hash</code> provides stable dry-run idempotency.</li>
+  </ul>
+
+  <h3>Supported Synthetic CSV Variants</h3>
+  <p>The parser currently tolerates comma, semicolon, or tab delimiters; quoted fields; a UTF-8 byte-order mark; ISO dates; U.S. slash dates; day-month-year dotted dates; separate date/time columns; weight values with embedded units; and decimal commas in semicolon-style exports. Rows missing date, numeric weight, or a supported unit are skipped.</p>
 
   <h2>Data Fields Available</h2>
   <p>For weight, MedM documents Body Mass / Weight plus body composition fields such as body fat percentage, BMI, muscle metrics, water metrics, basal metabolic rate, visceral fat, lean mass, and metabolic age. The first import should only support <code>body_weight</code>, then add BMI/body-fat once a real export format is inspected locally under <code>local-data/</code>.</p>
@@ -80,8 +101,9 @@
   <h2>Next Implementation Steps</h2>
   <ol>
     <li>Collect one real MedM or Apple Health weight export locally under <code>local-data/</code>.</li>
-    <li>Adapt the parser to the actual headers while keeping the synthetic fixture in git.</li>
+    <li>Adapt header aliases to the actual export while keeping only synthetic fixtures in git.</li>
     <li>Add dry-run validation: duplicate detection, units, impossible values, and date parsing.</li>
+    <li>After the metrics-platform branch lands, map these rows into the shared <code>daily_metrics</code> ingestion contract and use <code>source_record_id</code> or <code>raw_hash</code> for idempotent upserts.</li>
     <li>Insert into shared daily metrics storage only after schema review.</li>
   </ol>
 </main>

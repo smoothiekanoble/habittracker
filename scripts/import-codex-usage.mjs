@@ -24,10 +24,33 @@ const fileEnv = readEnvFile(join("scripts", "codex-usage.env"));
 const env = { ...fileEnv, ...process.env };
 const CODEX_HOME = env.CODEX_HOME?.trim() || join(homedir(), ".codex");
 
+class ConfigError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ConfigError";
+  }
+}
+
 function required(name) {
   const value = env[name]?.trim();
-  if (!value) throw new Error(`Missing ${name}. Copy scripts/codex-usage.env.example to scripts/codex-usage.env.`);
+  if (!value) throw new ConfigError(`Missing ${name}. Copy scripts/codex-usage.env.example to scripts/codex-usage.env.`);
   return value;
+}
+
+function validateImporterConfig() {
+  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  if (!supabaseUrl) {
+    throw new ConfigError(
+      "Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL. Copy scripts/codex-usage.env.example to scripts/codex-usage.env and fill in the local importer settings."
+    );
+  }
+  required("SUPABASE_SERVICE_ROLE_KEY");
+  const userId = required("CODEX_USAGE_USER_ID");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+    throw new ConfigError(
+      "CODEX_USAGE_USER_ID must be your Supabase auth.users UUID, not your ChatGPT/Codex account id. Find it in Supabase Authentication -> Users."
+    );
+  }
 }
 
 function chromePath() {
@@ -193,8 +216,26 @@ function normalizeLines(text, extraLines = []) {
     .filter(Boolean);
 }
 
+function usageContentReady(snapshot) {
+  const text = snapshot.text ?? "";
+  const title = snapshot.title ?? "";
+  if (/just a moment/i.test(title) || snapshot.inputValues?.some((value) => /cf-turnstile/i.test(value))) {
+    return true;
+  }
+  if (/log in|sign in|continue with google|continue with microsoft/i.test(text)) {
+    return true;
+  }
+  return /5\s*hour usage limit|weekly usage limit|credits remaining|codex analytics/i.test(text);
+}
+
 function parseUsageSnapshot(snapshot) {
   const text = snapshot.text ?? "";
+  const title = snapshot.title ?? "";
+  if (/just a moment/i.test(title) || snapshot.inputValues?.some((value) => /cf-turnstile/i.test(value))) {
+    throw new Error(
+      "Codex dashboard is showing a security check instead of the usage page. Open the importer Chrome profile, complete the check, then run the importer again."
+    );
+  }
   const extraLines = [
     ...(snapshot.ariaLabels ?? []),
     ...(snapshot.titles ?? []),
@@ -238,16 +279,27 @@ function parseUsageSnapshot(snapshot) {
   };
 }
 
-async function insertSnapshot(snapshot) {
-  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
-  if (!supabaseUrl) throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL.");
+function supabaseUrl() {
+  const value = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+  if (!value) throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL.");
+  return value;
+}
+
+function supabaseHeaders(extra = {}) {
   const serviceRoleKey = required("SUPABASE_SERVICE_ROLE_KEY");
+  return {
+    apikey: serviceRoleKey,
+    authorization: `Bearer ${serviceRoleKey}`,
+    ...extra,
+  };
+}
+
+async function insertSnapshot(snapshot) {
   const userId = required("CODEX_USAGE_USER_ID");
-  const response = await fetch(`${supabaseUrl}/rest/v1/codex_usage_snapshots`, {
+  const response = await fetch(`${supabaseUrl()}/rest/v1/codex_usage_snapshots`, {
     method: "POST",
     headers: {
-      apikey: serviceRoleKey,
-      authorization: `Bearer ${serviceRoleKey}`,
+      ...supabaseHeaders(),
       "content-type": "application/json",
       prefer: "return=minimal",
     },
@@ -259,17 +311,13 @@ async function insertSnapshot(snapshot) {
 }
 
 async function upsertDailyStats(stats) {
-  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
-  if (!supabaseUrl) throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL.");
-  const serviceRoleKey = required("SUPABASE_SERVICE_ROLE_KEY");
   const userId = required("CODEX_USAGE_USER_ID");
   const response = await fetch(
-    `${supabaseUrl}/rest/v1/codex_daily_usage_stats?on_conflict=user_id,date`,
+    `${supabaseUrl()}/rest/v1/codex_daily_usage_stats?on_conflict=user_id,date`,
     {
       method: "POST",
       headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
+        ...supabaseHeaders(),
         "content-type": "application/json",
         prefer: "resolution=merge-duplicates,return=minimal",
       },
@@ -347,9 +395,6 @@ function readLocalDailyActivity() {
 }
 
 async function readExistingDailyStats(date) {
-  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
-  if (!supabaseUrl) throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL.");
-  const serviceRoleKey = required("SUPABASE_SERVICE_ROLE_KEY");
   const userId = required("CODEX_USAGE_USER_ID");
   const params = new URLSearchParams({
     select: "max_five_hour_used_percent,max_weekly_used_percent,sample_count",
@@ -357,11 +402,8 @@ async function readExistingDailyStats(date) {
     date: `eq.${date}`,
     limit: "1",
   });
-  const response = await fetch(`${supabaseUrl}/rest/v1/codex_daily_usage_stats?${params.toString()}`, {
-    headers: {
-      apikey: serviceRoleKey,
-      authorization: `Bearer ${serviceRoleKey}`,
-    },
+  const response = await fetch(`${supabaseUrl()}/rest/v1/codex_daily_usage_stats?${params.toString()}`, {
+    headers: supabaseHeaders(),
   });
   if (!response.ok) {
     throw new Error(`Supabase daily stats read failed: ${response.status} ${await response.text()}`);
@@ -391,6 +433,44 @@ async function writeDailyStats({ status, metrics = null, errorMessage = null }) 
   });
 }
 
+async function deleteOldSnapshots(retentionDays = 7) {
+  const userId = required("CODEX_USAGE_USER_ID");
+  const latestParams = new URLSearchParams({
+    select: "id",
+    user_id: `eq.${userId}`,
+    order: "captured_at.desc",
+    limit: "1",
+  });
+  const latestResponse = await fetch(
+    `${supabaseUrl()}/rest/v1/codex_usage_snapshots?${latestParams.toString()}`,
+    { headers: supabaseHeaders() }
+  );
+  if (!latestResponse.ok) {
+    throw new Error(`Supabase snapshot retention read failed: ${latestResponse.status} ${await latestResponse.text()}`);
+  }
+  const latestRows = await latestResponse.json();
+  const latestId = latestRows[0]?.id;
+  if (!latestId) return;
+
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const deleteParams = new URLSearchParams({
+    user_id: `eq.${userId}`,
+    captured_at: `lt.${cutoff}`,
+    id: `neq.${latestId}`,
+  });
+  const deleteResponse = await fetch(
+    `${supabaseUrl()}/rest/v1/codex_usage_snapshots?${deleteParams.toString()}`,
+    {
+      method: "DELETE",
+      headers: supabaseHeaders({ prefer: "return=minimal" }),
+    }
+  );
+  if (!deleteResponse.ok) {
+    throw new Error(`Supabase snapshot retention delete failed: ${deleteResponse.status} ${await deleteResponse.text()}`);
+  }
+  console.log(`Deleted Codex usage snapshots older than ${retentionDays} days if any existed.`);
+}
+
 async function captureDashboard() {
   const port = Number(env.CODEX_USAGE_REMOTE_DEBUGGING_PORT || DEFAULT_PORT);
   const dashboardUrl = env.CODEX_USAGE_DASHBOARD_URL || DEFAULT_DASHBOARD_URL;
@@ -418,9 +498,9 @@ async function captureDashboard() {
   try {
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
-    await sleep(8_000);
-    const result = await cdp.send("Runtime.evaluate", {
-      expression: `(() => {
+    const readSnapshot = async () => {
+      const result = await cdp.send("Runtime.evaluate", {
+        expression: `(() => {
         const text = document.body ? document.body.innerText : "";
         const ariaLabels = Array.from(document.querySelectorAll("[aria-label]"))
           .map((el) => el.getAttribute("aria-label"))
@@ -444,9 +524,21 @@ async function captureDashboard() {
           }));
         return { url: location.href, title: document.title, text, ariaLabels, titles, inputValues, meterValues };
       })()`,
-      returnByValue: true,
-    });
-    return result.result?.value ?? {};
+        returnByValue: true,
+      });
+      return result.result?.value ?? {};
+    };
+
+    const deadline = Date.now() + 30_000;
+    let snapshot = await readSnapshot();
+    while (!usageContentReady(snapshot) && Date.now() < deadline) {
+      await sleep(750);
+      snapshot = await readSnapshot();
+    }
+    if (!usageContentReady(snapshot)) {
+      throw new Error("Timed out waiting for Codex usage dashboard content to load.");
+    }
+    return snapshot;
   } finally {
     cdp.close();
   }
@@ -454,6 +546,7 @@ async function captureDashboard() {
 
 async function main() {
   try {
+    validateImporterConfig();
     const snapshot = await captureDashboard();
     const debugPath = writeLatestDebugFile(
       "latest-dashboard-snapshot.json",
@@ -463,20 +556,23 @@ async function main() {
     const metrics = parseUsageSnapshot(snapshot);
     await insertSnapshot({ status: "ok", error_message: null, ...metrics });
     await writeDailyStats({ status: "ok", metrics });
+    await deleteOldSnapshots(7);
     console.log("Inserted Codex usage snapshot.");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    try {
-      await insertSnapshot({
-        status: "error",
-        error_message: message,
-        raw_metrics: { error: message },
-      });
-      await writeDailyStats({ status: "error", errorMessage: message });
-    } catch (insertError) {
-      const insertMessage =
-        insertError instanceof Error ? insertError.message : String(insertError);
-      console.error(`Could not insert error snapshot: ${insertMessage}`);
+    if (!(error instanceof ConfigError)) {
+      try {
+        await insertSnapshot({
+          status: "error",
+          error_message: message,
+          raw_metrics: { error: message },
+        });
+        await writeDailyStats({ status: "error", errorMessage: message });
+      } catch (insertError) {
+        const insertMessage =
+          insertError instanceof Error ? insertError.message : String(insertError);
+        console.error(`Could not insert error snapshot: ${insertMessage}`);
+      }
     }
     console.error(message);
     process.exitCode = 1;

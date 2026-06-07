@@ -4,6 +4,7 @@ web/.env.local
 .env*.local
 scripts/codex-usage.env
 scripts/codex-usage-debug/
+local-data/
 ios/HabitTracker/Resources/SupabaseConfig.plist
 
 # Dependencies and build

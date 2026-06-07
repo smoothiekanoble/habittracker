@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Usage Import: Local Windows Scheduler</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18181b;
+      --muted: #52525b;
+      --line: #d4d4d8;
+      --paper: #fafafa;
+      --panel: #ffffff;
+      --blue: #1d4ed8;
+      --warn-bg: #fffbeb;
+      --warn-line: #f59e0b;
+      --good-bg: #ecfdf5;
+      --good-line: #10b981;
+    }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(980px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.15; }
+    h1 { font-size: clamp(2rem, 4vw, 3.25rem); letter-spacing: 0; }
+    h2 { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 1.35rem; }
+    h3 { margin-top: 22px; font-size: 1.05rem; }
+    p { margin: 10px 0 0; color: var(--muted); }
+    ul, ol { margin: 10px 0 0 1.25rem; color: var(--muted); }
+    li { margin: 7px 0; }
+    code {
+      border: 1px solid #e4e4e7;
+      border-radius: 6px;
+      background: #f4f4f5;
+      padding: 0.1rem 0.35rem;
+      font-size: 0.92em;
+    }
+    pre {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #18181b;
+      color: #fafafa;
+      padding: 14px;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+    table {
+      width: 100%;
+      margin-top: 14px;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: 0; }
+    th { background: #f4f4f5; color: #3f3f46; font-size: 0.88rem; }
+    .hero {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 28px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 0 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .note {
+      margin-top: 14px;
+      border-left: 4px solid var(--blue);
+      border-radius: 6px;
+      background: #eff6ff;
+      padding: 14px;
+      color: #1e3a8a;
+    }
+    .warning {
+      margin-top: 14px;
+      border-left: 4px solid var(--warn-line);
+      border-radius: 6px;
+      background: var(--warn-bg);
+      padding: 14px;
+      color: #78350f;
+    }
+    .success {
+      margin-top: 14px;
+      border-left: 4px solid var(--good-line);
+      border-radius: 6px;
+      background: var(--good-bg);
+      padding: 14px;
+      color: #064e3b;
+    }
+    .note p, .warning p, .success p { margin: 0; color: inherit; }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>Codex Usage Import</h1>
+    <p>Local Windows Task Scheduler setup for importing Codex usage snapshots into Supabase so the Habit Tracker web app can show current development budget data.</p>
+    <div class="meta">
+      <span class="pill">Updated: 2026-06-06</span>
+      <span class="pill">Repo: <code>C:\dev\personal\habittracker</code></span>
+      <span class="pill">Wrapper: <code>scripts\run-codex-usage-import.ps1</code></span>
+      <span class="pill">Scheduler: Windows Task Scheduler</span>
+    </div>
+  </section>
+
+  <h2>What It Does</h2>
+  <p>The importer opens the Codex usage dashboard in a dedicated local Chrome or Edge profile, waits for real dashboard content, reads the rendered text through Chrome's local debugging interface, parses usage values, and writes snapshots to Supabase.</p>
+  <p>It also reads local Codex session metadata from <code>CODEX_HOME\sessions</code> and writes sanitized daily counts to Supabase. It does not store prompts, responses, terminal output, cookies, tokens, or raw session logs.</p>
+
+  <h2>Local Only</h2>
+  <div class="warning">
+    <p>This job must run through Windows Task Scheduler, not Codex automation, GitHub Actions, Vercel cron, Supabase scheduled functions, or any other cloud runner.</p>
+  </div>
+  <ul>
+    <li>It depends on a local browser profile that is logged in to ChatGPT/Codex.</li>
+    <li>It reads local Codex session metadata from disk.</li>
+    <li>Cloud jobs must not receive ChatGPT cookies, browser state, local session files, or service-role secrets.</li>
+    <li>The Supabase service role key belongs only in <code>scripts/codex-usage.env</code>, which is gitignored.</li>
+    <li>Debug dumps and logs stay under gitignored local paths.</li>
+  </ul>
+
+  <h2>Required Local Config</h2>
+  <p>Create <code>scripts/codex-usage.env</code> from <code>scripts/codex-usage.env.example</code>. Fill in these values:</p>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>SUPABASE_URL</code></td>
+        <td>Your Supabase project URL. <code>NEXT_PUBLIC_SUPABASE_URL</code> also works, but <code>SUPABASE_URL</code> is clearer for the local importer.</td>
+      </tr>
+      <tr>
+        <td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+        <td>Service role key used only by this local importer. Never commit it.</td>
+      </tr>
+      <tr>
+        <td><code>CODEX_USAGE_USER_ID</code></td>
+        <td>Your Supabase <code>auth.users.id</code> UUID. This is not a ChatGPT account id.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Optional values include <code>CODEX_USAGE_CHROME_PROFILE_DIR</code>, <code>CODEX_USAGE_CHROME_PATH</code>, <code>CODEX_USAGE_REMOTE_DEBUGGING_PORT</code>, <code>CODEX_USAGE_HEADLESS</code>, and <code>CODEX_HOME</code>.</p>
+
+  <h2>Wrapper Behavior</h2>
+  <p>The wrapper is:</p>
+  <pre><code>C:\dev\personal\habittracker\scripts\run-codex-usage-import.ps1</code></pre>
+  <ul>
+    <li>Changes into <code>C:\dev\personal\habittracker</code>.</li>
+    <li>Creates <code>local-data\logs</code> if missing.</li>
+    <li>Skips outside active hours: 10:00 AM through 11:59 PM local time.</li>
+    <li>Uses <code>local-data\codex-usage-import.lock</code> to prevent overlapping imports.</li>
+    <li>Treats locks older than 45 minutes as stale.</li>
+    <li>Runs <code>node scripts/import-codex-usage.mjs</code>.</li>
+    <li>Writes timestamped stdout/stderr logs under <code>local-data\logs</code>.</li>
+    <li>Deletes local importer logs older than 7 days.</li>
+    <li>Exits with the Node importer's exit code when the importer actually runs.</li>
+  </ul>
+
+  <h2>Retention</h2>
+  <p>Local logs under <code>local-data\logs</code> are kept for 7 days. After a successful snapshot import, the importer deletes <code>codex_usage_snapshots</code> rows older than 7 days for the configured <code>CODEX_USAGE_USER_ID</code>, while preserving the newest/latest snapshot.</p>
+  <p>The cleanup only touches <code>public.codex_usage_snapshots</code>. It does not delete habits, habit logs, auth users, or unrelated tables.</p>
+
+  <h2>Manual Test</h2>
+  <p>Run this from PowerShell:</p>
+  <pre><code>powershell.exe -ExecutionPolicy Bypass -File "C:\dev\personal\habittracker\scripts\run-codex-usage-import.ps1"</code></pre>
+  <p>Then check the newest logs under:</p>
+  <pre><code>C:\dev\personal\habittracker\local-data\logs</code></pre>
+  <p>If it runs outside active hours, the wrapper should log <code>Skipping Codex usage import outside active hours</code> and exit <code>0</code>.</p>
+
+  <h2>Windows Task Scheduler</h2>
+  <ol>
+    <li>Open Task Scheduler.</li>
+    <li>Create a new task using your normal Windows user account.</li>
+    <li>Set the trigger to <strong>Daily</strong>.</li>
+    <li>Set <strong>Repeat task every</strong> to <strong>30 minutes</strong>.</li>
+    <li>Set <strong>for a duration of</strong> to <strong>1 day</strong>, so it repeats daily.</li>
+    <li>Select <strong>Run only when user is logged on</strong>.</li>
+    <li>Do not select <strong>Run with highest privileges</strong> unless there is a proven need.</li>
+    <li>Enable <strong>Stop the task if it runs longer than</strong> and set it to <strong>30 minutes</strong>.</li>
+    <li>Add the action below.</li>
+  </ol>
+
+  <table>
+    <thead>
+      <tr><th>Task Scheduler Field</th><th>Value</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Program/script</td>
+        <td><code>powershell.exe</code></td>
+      </tr>
+      <tr>
+        <td>Arguments</td>
+        <td><code>-ExecutionPolicy Bypass -File "C:\dev\personal\habittracker\scripts\run-codex-usage-import.ps1"</code></td>
+      </tr>
+      <tr>
+        <td>Start in</td>
+        <td><code>C:\dev\personal\habittracker</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="success">
+    <p>Final scheduler owner: Windows Task Scheduler. Create or approve the task manually because Windows account context and browser login state matter.</p>
+  </div>
+
+  <h2>Do Not Commit</h2>
+  <ul>
+    <li><code>scripts/codex-usage.env</code></li>
+    <li><code>web/.env.local</code> or any <code>.env.local</code></li>
+    <li>Chrome cookies, tokens, browser profile contents, or service role keys</li>
+    <li><code>scripts/codex-usage-debug/</code></li>
+    <li><code>local-data/</code></li>
+  </ul>
+</main>
+</body>
+</html>

@@ -57,9 +57,10 @@ export const SUBMIT_SELECTORS = [
 
 function usage() {
   return [
-    "Usage: node scripts/medm-health/sync-medm-portal.mjs [--days 30] [--headless true|false]",
+    "Usage: node scripts/medm-health/sync-medm-portal.mjs [--days 30] [--headless true|false] [--import]",
     "",
     "Required env vars: MEDM_EMAIL, MEDM_PASSWORD, MEDM_RECORD_ID",
+    "Import env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_METRICS_USER_ID",
     "Optional env vars: MEDM_BASE_URL, MEDM_SYNC_TIMEOUT_SECONDS, MEDM_SYNC_POLL_SECONDS",
   ].join("\n");
 }
@@ -68,6 +69,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     days: 30,
     headless: true,
+    dryRun: true,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -80,6 +82,11 @@ export function parseArgs(argv = process.argv.slice(2)) {
     } else if (arg === "--headless") {
       options.headless = value !== "false";
       index += 1;
+    } else if (arg === "--dry-run") {
+      options.dryRun = value !== "false";
+      index += 1;
+    } else if (arg === "--import") {
+      options.dryRun = false;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
     } else {
@@ -92,6 +99,58 @@ export function parseArgs(argv = process.argv.slice(2)) {
   }
 
   return options;
+}
+
+export function dailyMetricPayload(row, userId) {
+  const sourceDetail = {
+    detail: row.source_detail ?? null,
+    source_record_id: row.source_record_id ?? null,
+    raw_hash: row.raw_hash ?? null,
+  };
+
+  return {
+    user_id: userId,
+    metric_date: row.date,
+    metric_type: row.metric_type,
+    value: row.value,
+    unit: row.unit,
+    source: row.source,
+    source_detail: Object.fromEntries(
+      Object.entries(sourceDetail).filter(([, value]) => value !== null),
+    ),
+  };
+}
+
+export function dailyMetricPayloads(rows, userId) {
+  return dedupeDailyMetricRows(rows).map((row) => dailyMetricPayload(row, userId));
+}
+
+export function dedupeDailyMetricRows(rows) {
+  const sortedRows = [...rows].sort((left, right) =>
+    stableMetricRowSortKey(left).localeCompare(stableMetricRowSortKey(right)),
+  );
+  const byDailyMetric = new Map();
+
+  for (const row of sortedRows) {
+    byDailyMetric.set(metricRowKey(row), row);
+  }
+
+  return [...byDailyMetric.values()];
+}
+
+function metricRowKey(row) {
+  return [row.date, row.metric_type, row.source].join("|");
+}
+
+function stableMetricRowSortKey(row) {
+  return [
+    row.date,
+    row.metric_type,
+    row.source,
+    row.source_detail ?? "",
+    row.source_record_id ?? "",
+    row.raw_hash ?? "",
+  ].join("|");
 }
 
 export function localBackfillWindow(days, now = new Date()) {
@@ -203,6 +262,20 @@ export function summarizeRows(rows) {
   return {
     rowCount: rows.length,
     dateRange: dates.length > 0 ? `${dates[0]} to ${dates[dates.length - 1]}` : "none",
+  };
+}
+
+export function summarizeParsedFiles(parsedFiles) {
+  const rows = parsedFiles.flatMap((file) => file.rows);
+  const warnings = parsedFiles.reduce((total, file) => total + file.warnings.length, 0);
+  const summary = summarizeRows(rows);
+
+  return {
+    rowCount: summary.rowCount,
+    dateRange: summary.dateRange,
+    warningCount: warnings,
+    fileCount: parsedFiles.length,
+    uniqueDailyMetricCount: dedupeDailyMetricRows(rows).length,
   };
 }
 
@@ -396,6 +469,44 @@ async function downloadReport(context, baseUrl, link) {
   return Buffer.from(await response.body());
 }
 
+async function upsertDailyMetrics(rows, env) {
+  const missing = [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_METRICS_USER_ID",
+  ].filter((name) => !env[name]);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing import env vars: ${missing.join(", ")}`);
+  }
+
+  if (rows.length === 0) {
+    return { upsertedRows: 0 };
+  }
+
+  const payloads = dailyMetricPayloads(rows, env.SUPABASE_METRICS_USER_ID);
+  const url = new URL("/rest/v1/daily_metrics", env.SUPABASE_URL);
+  url.searchParams.set("on_conflict", "user_id,metric_date,metric_type,source");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(payloads),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`daily_metrics upsert failed with HTTP ${response.status}: ${errorText}`);
+  }
+
+  return { upsertedRows: payloads.length };
+}
+
 function ensureImportDir() {
   mkdirSync(IMPORT_ROOT, { recursive: true });
   return IMPORT_ROOT;
@@ -448,6 +559,7 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
   const window = localBackfillWindow(options.days);
   const sessionId = safeTimestamp();
   const importDir = ensureImportDir();
+  const parsedFiles = [];
 
   try {
     const { chromium } = await import("playwright");
@@ -490,10 +602,18 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
         writeFileSync(csvPath, csvFile.text);
         const parsed = parseMedmWeightCsv(csvFile.text);
         const summary = summarizeRows(parsed.rows);
+        parsedFiles.push({
+          path: csvPath,
+          rows: parsed.rows,
+          warnings: parsed.warnings,
+        });
 
         console.log(`CSV file found: ${csvPath}`);
         console.log(`Parsed rows: ${summary.rowCount}`);
         console.log(`Parsed date range: ${summary.dateRange}`);
+        console.log(
+          "Normalized fields: date, metric_type, value, unit, source, source_detail.",
+        );
 
         if (parsed.warnings.length > 0) {
           console.log(`Parser warnings: ${parsed.warnings.length}`);
@@ -503,10 +623,25 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
       await browser.close();
     }
 
-    if (!existsSync(join("supabase", "migrations"))) {
-      console.log("TODO: add daily_metrics upsert after the shared metrics schema lands.");
+    const totalSummary = summarizeParsedFiles(parsedFiles);
+
+    if (totalSummary.rowCount === 0) {
+      throw new Error("No valid MedM body-weight rows were parsed from the downloaded report.");
+    }
+
+    console.log(
+      `MedM weight sync summary: ${totalSummary.rowCount} rows across ${totalSummary.fileCount} CSV file(s), ${totalSummary.dateRange}.`,
+    );
+
+    if (options.dryRun) {
+      console.log(`Unique daily metric rows ready for upsert: ${totalSummary.uniqueDailyMetricCount}`);
+      console.log("Dry run only. Pass --import to upsert into daily_metrics.");
+    } else if (!existsSync(join("supabase", "migrations"))) {
+      throw new Error("Cannot import because supabase/migrations is missing.");
     } else {
-      console.log("Dry run only. TODO: wire parsed rows into daily_metrics after schema review.");
+      const rows = dedupeDailyMetricRows(parsedFiles.flatMap((file) => file.rows));
+      const result = await upsertDailyMetrics(rows, env);
+      console.log(`Imported rows into daily_metrics: ${result.upsertedRows}`);
     }
 
     return 0;

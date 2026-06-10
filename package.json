@@ -6,6 +6,7 @@
   "scripts": {
     "medm:parse": "node scripts/medm-health/parse-medm-weight-csv.mjs",
     "medm:sync:dry-run": "node scripts/medm-health/sync-medm-portal.mjs",
+    "medm:sync:import": "node scripts/medm-health/sync-medm-portal.mjs --import",
     "test:medm": "node scripts/medm-health/test-parse-medm-weight.mjs && node scripts/medm-health/test-sync-medm-portal.mjs"
   },
   "devDependencies": {

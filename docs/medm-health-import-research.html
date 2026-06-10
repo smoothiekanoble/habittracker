@@ -112,14 +112,39 @@ $env:MEDM_RECORD_ID="..."
 npm run medm:sync:dry-run -- --days 30</pre>
   <p>Downloaded ZIP and CSV files are saved only under <code>local-data/imports/medm-health/</code>. The script does not create Playwright storage-state files, commit cookies, or upload artifacts.</p>
 
+  <h3>Real Import</h3>
+  <p>Dry-run is the default. A real import requires the Supabase migration <code>20260610000000_create_daily_metrics.sql</code> to be applied first, then an explicit import command:</p>
+  <pre>$env:SUPABASE_URL="https://..."
+$env:SUPABASE_SERVICE_ROLE_KEY="..."
+$env:SUPABASE_METRICS_USER_ID="auth-user-uuid"
+npm run medm:sync:import -- --days 30</pre>
+  <p>The import maps MedM weight rows into <code>daily_metrics</code> and upserts on <code>user_id, metric_date, metric_type, source</code>. If a report contains multiple MedM weight rows for the same day, the importer collapses them deterministically to one daily row before upsert. It imports <code>body_weight</code> only and does not process unrelated health measurements. The service-role key is for local/server automation only and must never be exposed in client code.</p>
+
   <h3>GitHub Actions</h3>
-  <p>The workflow <code>.github/workflows/medm-health-sync.yml</code> supports manual runs and a daily cron. It requires these repository secrets:</p>
+  <p>The workflow <code>.github/workflows/medm-health-sync.yml</code> supports manual runs and a daily cron. Scheduled runs are dry-run only. Manual runs default to dry-run and can opt into import by setting <code>dry_run=false</code>.</p>
+  <p>Dry-run requires these repository secrets:</p>
   <ul>
     <li><code>MEDM_EMAIL</code></li>
     <li><code>MEDM_PASSWORD</code></li>
     <li><code>MEDM_RECORD_ID</code></li>
   </ul>
-  <p>The workflow installs Playwright Chromium, runs synthetic parser/helper tests, and runs the portal sync in dry-run mode. It does not upload the downloaded report as an artifact and should not expose raw measurements in logs.</p>
+  <p>Real import additionally requires:</p>
+  <ul>
+    <li><code>SUPABASE_URL</code> as a GitHub secret</li>
+    <li><code>SUPABASE_SERVICE_ROLE_KEY</code> as a GitHub secret</li>
+    <li><code>SUPABASE_METRICS_USER_ID</code> as a GitHub Actions variable containing the target <code>auth.users.id</code></li>
+  </ul>
+  <p>The workflow installs Playwright Chromium, runs synthetic parser/helper tests, and then runs the portal sync. It does not upload downloaded reports as artifacts and logs only report status, CSV filenames, parsed row counts, and date ranges.</p>
+
+  <h3>Storage</h3>
+  <p>The new <code>daily_metrics</code> table is generic and private. RLS allows authenticated users to read, insert, and update only rows where <code>auth.uid() = user_id</code>. The automation upsert uses server-side secrets and the target user id; no service-role secret is used in browser/client code.</p>
+
+  <h3>Rollback and Safety</h3>
+  <ul>
+    <li>To stop imports, leave the workflow in dry-run mode or remove the Supabase import secrets/variable.</li>
+    <li>To remove imported MedM rows after testing, delete rows where <code>source = 'medm_health'</code> for the target user.</li>
+    <li>Do not commit files from <code>local-data/</code>. Real MedM ZIP/CSV downloads are local-only debug artifacts.</li>
+  </ul>
 
   <h2>Data Fields Available</h2>
   <p>For weight, MedM documents Body Mass / Weight plus body composition fields such as body fat percentage, BMI, muscle metrics, water metrics, basal metabolic rate, visceral fat, lean mass, and metabolic age. The first import should only support <code>body_weight</code>, then add BMI/body-fat once a real export format is inspected locally under <code>local-data/</code>.</p>

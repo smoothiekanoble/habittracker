@@ -1,0 +1,14 @@
+{
+  "name": "habittracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "medm:parse": "node scripts/medm-health/parse-medm-weight-csv.mjs",
+    "medm:sync:dry-run": "node scripts/medm-health/sync-medm-portal.mjs",
+    "test:medm": "node scripts/medm-health/test-parse-medm-weight.mjs && node scripts/medm-health/test-sync-medm-portal.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.44.0"
+  }
+}

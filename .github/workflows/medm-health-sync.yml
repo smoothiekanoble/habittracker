@@ -1,0 +1,47 @@
+name: MedM Health sync dry run
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Backfill window in local days"
+        required: false
+        default: "30"
+  schedule:
+    - cron: "17 10 * * *"
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MEDM_EMAIL: ${{ secrets.MEDM_EMAIL }}
+      MEDM_PASSWORD: ${{ secrets.MEDM_PASSWORD }}
+      MEDM_RECORD_ID: ${{ secrets.MEDM_RECORD_ID }}
+      MEDM_SYNC_TIMEOUT_SECONDS: "180"
+      MEDM_SYNC_POLL_SECONDS: "10"
+    steps:
+      - name: Check required secrets
+        shell: bash
+        run: |
+          test -n "$MEDM_EMAIL"
+          test -n "$MEDM_PASSWORD"
+          test -n "$MEDM_RECORD_ID"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run parser tests
+        run: npm run test:medm
+
+      - name: Dry-run MedM portal sync
+        run: npm run medm:sync:dry-run -- --days "${{ github.event.inputs.days || '30' }}"

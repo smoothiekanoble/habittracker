@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MedM Health Body Weight Import Research</title>
+  <style>
+    :root { color-scheme: light; --ink: #1f201b; --muted: #666b5d; --line: #e2e4da; --panel: #fafaf4; --accent: #7a6419; --green: #28795f; }
+    body { margin: 0; font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: #fff; }
+    main { max-width: 920px; margin: 0 auto; padding: 44px 22px 72px; }
+    h1 { font-size: clamp(2rem, 5vw, 3.35rem); line-height: 1.05; margin: 0 0 12px; letter-spacing: 0; }
+    h2 { margin: 34px 0 10px; font-size: 1.35rem; }
+    h3 { margin: 22px 0 8px; font-size: 1.03rem; }
+    p { margin: 0 0 14px; }
+    a { color: var(--green); }
+    .lede { color: var(--muted); font-size: 1.08rem; max-width: 760px; }
+    .callout { margin: 22px 0; padding: 18px; border: 1px solid var(--line); border-left: 5px solid var(--green); background: var(--panel); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.95rem; }
+    th, td { text-align: left; vertical-align: top; padding: 11px 10px; border-bottom: 1px solid var(--line); }
+    th { background: #f2f3ea; font-weight: 700; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+    pre { overflow: auto; padding: 14px; background: #1b1b12; color: #f8f6e9; border-radius: 8px; }
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+    .meta { color: var(--muted); font-size: 0.92rem; margin-bottom: 28px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>MedM Health Body Weight Import Research</h1>
+  <p class="lede">Feasibility review for importing body-weight readings from MedM Health or a MedM-connected scale into Habit Tracker.</p>
+  <p class="meta">Prepared June 7, 2026. Implementation updated June 10, 2026. Worktree: <code>codex/medm-health-import</code>.</p>
+
+  <section class="callout">
+    <h2>Recommendation</h2>
+    <p>MedM body weight ingestion looks feasible for v1 through user-controlled file export, with Apple Health as the best iPhone source of truth if MedM sync is already enabled. Start with CSV/XLSX-style file import for weight readings and avoid undocumented cloud APIs.</p>
+  </section>
+
+  <h2>Options Considered</h2>
+  <table>
+    <thead><tr><th>Path</th><th>Fit for v1</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>MedM app export</td><td>Best practical first path</td><td>MedM describes Health Diary as supporting basic data export, PDF/XLSX reports for Premium, and export/sharing options. Source: <a href="https://www.medm.com/apps/health.html">MedM Health Diary</a>.</td></tr>
+      <tr><td>Apple Health sync</td><td>Best iPhone source of truth</td><td>The MedM manual says Apple Health sync supports Weight and that MedM exports Weight, BMI, lean body mass, and body fat percentage to Apple Health where supported. Source: <a href="https://www.medm.com/apps/user_manual.html">MedM Health user manual</a>.</td></tr>
+      <tr><td>Google Health Connect sync</td><td>Good Android path</td><td>MedM documents Health Connect support for Android and import/export of weight among other metrics. Useful if the source phone is Android, less central for this iPhone-first project.</td></tr>
+      <tr><td>MedM cloud/API</td><td>Not for personal v1</td><td>MedM has platform/cloud offerings, but this spike did not find a simple personal OAuth/API path for Habit Tracker. Treat any API work as a later vendor-integration project.</td></tr>
+      <tr><td>Manual entry</td><td>Acceptable fallback</td><td>If exports are annoying, body weight is low-frequency enough that manual entry remains viable.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Best Practical Path</h2>
+  <p>For the userâ€™s current iPhone-first v1, make Apple Health the canonical phone-side health hub. Let MedM write weight to Apple Health when possible, then import a user-controlled export from Apple Health or from MedMâ€™s own report/export flow. This avoids depending on MedM credentials inside Habit Tracker.</p>
+
+  <h2>Prototype</h2>
+  <p>This branch now includes a source-specific MedM body-weight CSV adapter. It is a local CLI utility only: it performs no Supabase writes, applies no migrations, and builds no dashboard UI.</p>
+  <p>Run it against a synthetic fixture with:</p>
+  <pre>node scripts/medm-health/parse-medm-weight-csv.mjs scripts/medm-health/fixtures/synthetic-medm-weight.csv</pre>
+  <p>It prints normalized JSON to stdout and row-level warnings to stderr. Malformed rows are skipped with row numbers and compact row context, while valid rows continue through. If the file has no usable header/data rows or no valid body-weight rows, the CLI exits nonzero.</p>
+  <p>Expected output rows use the shared normalized metric shape:</p>
+  <pre>{
+  "date": "2026-06-01",
+  "metric_type": "body_weight",
+  "value": 181.8,
+  "unit": "lb",
+  "source": "medm_health",
+  "source_detail": "Synthetic Scale; MedM Health CSV; time 07:15",
+  "source_record_id": "medm-synth-001"
+}</pre>
+
+  <h2>Parser Contract</h2>
+  <p>The parser is adapter-only and performs no database writes. It accepts synthetic MedM-style CSV exports and emits JSON rows shaped as <code>{ date, metric_type, value, unit, source, source_detail?, source_record_id?, raw_hash? }</code>.</p>
+  <ul>
+    <li><code>metric_type</code> is always <code>body_weight</code>.</li>
+    <li><code>source</code> is always <code>medm_health</code>.</li>
+    <li><code>unit</code> is normalized to <code>lb</code> or <code>kg</code> from the unit column, value text, or weight header.</li>
+    <li><code>source_detail</code> combines available app, device, export source, and time details.</li>
+    <li><code>source_record_id</code> is used when an export row has an ID; otherwise <code>raw_hash</code> provides stable dry-run idempotency. Duplicate rows without IDs produce the same hash deterministically.</li>
+  </ul>
+
+  <h3>Supported Synthetic CSV Variants</h3>
+  <p>The parser currently tolerates comma, semicolon, or tab delimiters; quoted fields; a UTF-8 byte-order mark; header variants such as Date, date, Timestamp, Time, Weight, Body Weight, Body Mass, Unit, and Weight Unit; ISO dates; U.S. slash dates; day-month-year dotted dates; separate date/time columns; weight values with embedded units; pounds and kilograms; and decimal commas in semicolon-style exports. Rows missing date, numeric weight, or a supported unit are skipped with warnings.</p>
+
+  <h3>Verification Fixtures</h3>
+  <ul>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-weight.csv</code> covers common pound and mixed-unit rows with explicit record IDs.</li>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-weight-kg.csv</code> covers semicolon-delimited kilogram rows and decimal-comma values.</li>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-weight-malformed.csv</code> covers invalid dates, nonnumeric weights, and unsupported units.</li>
+  </ul>
+  <p>Run parser checks with:</p>
+  <pre>node --check scripts/medm-health/parse-medm-weight-csv.mjs
+node --check scripts/medm-health/test-parse-medm-weight.mjs
+node scripts/medm-health/test-parse-medm-weight.mjs</pre>
+
+  <h2>MedM Health Portal Sync Spike</h2>
+  <p>This branch also includes a local-only Playwright spike for ordering and downloading a MedM Health Portal weight report. It is intentionally dry-run only: it logs report status, CSV discovery, parsed row count, and parsed date range, but does not print body-weight values or write to Supabase.</p>
+
+  <h3>Discovered Portal Flow</h3>
+  <ol>
+    <li>Log in to <code>https://health.medm.com</code> with a MedM user account.</li>
+    <li>Create a report with <code>POST /en/records/:recordId/reports</code>.</li>
+    <li>Submit <code>from_date</code>, <code>to_date</code>, <code>medical_record_id</code>, <code>queue_period=never</code>, <code>measurement_types[]=weight</code>, <code>format=csv</code>, and <code>group_by=type</code>.</li>
+    <li>Read <code>GET /en/records/:recordId/reports</code> and find the newest <code>/download_report?id=...</code> link.</li>
+    <li>Download the ZIP report, extract CSV files locally, and parse each CSV through the MedM body-weight adapter.</li>
+  </ol>
+
+  <h3>Local Usage</h3>
+  <p>Install root dependencies and run a dry run with credentials supplied by environment variables:</p>
+  <pre>npm install
+$env:MEDM_EMAIL="you@example.com"
+$env:MEDM_PASSWORD="..."
+$env:MEDM_RECORD_ID="..."
+npm run medm:sync:dry-run -- --days 30</pre>
+  <p>Downloaded ZIP and CSV files are saved only under <code>local-data/imports/medm-health/</code>. The script does not create Playwright storage-state files, commit cookies, or upload artifacts.</p>
+
+  <h3>GitHub Actions</h3>
+  <p>The workflow <code>.github/workflows/medm-health-sync.yml</code> supports manual runs and a daily cron. It requires these repository secrets:</p>
+  <ul>
+    <li><code>MEDM_EMAIL</code></li>
+    <li><code>MEDM_PASSWORD</code></li>
+    <li><code>MEDM_RECORD_ID</code></li>
+  </ul>
+  <p>The workflow installs Playwright Chromium, runs synthetic parser/helper tests, and runs the portal sync in dry-run mode. It does not upload the downloaded report as an artifact and should not expose raw measurements in logs.</p>
+
+  <h2>Data Fields Available</h2>
+  <p>For weight, MedM documents Body Mass / Weight plus body composition fields such as body fat percentage, BMI, muscle metrics, water metrics, basal metabolic rate, visceral fat, lean mass, and metabolic age. The first import should only support <code>body_weight</code>, then add BMI/body-fat once a real export format is inspected locally under <code>local-data/</code>.</p>
+
+  <h2>Manual User Steps</h2>
+  <ol>
+    <li>Pair the body-weight scale with MedM Health Diary or enter weight manually.</li>
+    <li>Enable Apple Health sync for Weight if using Apple Health as the hub.</li>
+    <li>Export a weight report/file from MedM or Apple Health.</li>
+    <li>Place real local exports under <code>local-data/imports/medm-health/</code>. The entire <code>local-data/</code> tree is gitignored and should remain private.</li>
+    <li>Run a local dry-run importer and review normalized rows before uploading.</li>
+  </ol>
+
+  <h2>Privacy Rules</h2>
+  <ul>
+    <li>Do not commit raw body-weight exports, health dumps, cookies, tokens, <code>.env.local</code>, Supabase secrets, or personal measurement data.</li>
+    <li>Only synthetic fixtures belong in Git.</li>
+    <li>Warnings may echo compact row context for debugging, so treat CLI output from real files as local/private.</li>
+    <li>Portal sync downloads are local dry-run material and belong only under gitignored <code>local-data/</code>.</li>
+  </ul>
+
+  <h2>Risks and Limitations</h2>
+  <ul>
+    <li>Actual MedM export headers need to be inspected with a real local file before final parser hardening.</li>
+    <li>Premium subscription may affect available report/export and ecosystem sync options.</li>
+    <li>Body composition fields vary by scale and may not map cleanly across Apple Health, MedM, and Habit Tracker.</li>
+    <li>Do not commit real weight exports; keep them under gitignored <code>local-data/</code>.</li>
+  </ul>
+
+  <h2>Next Implementation Steps</h2>
+  <ol>
+    <li>Collect one real MedM or Apple Health weight export locally under <code>local-data/</code>.</li>
+    <li>Adapt header aliases to the actual export while keeping only synthetic fixtures in git.</li>
+    <li>Add dry-run validation: duplicate detection, units, impossible values, and date parsing.</li>
+    <li>After the metrics-platform branch lands, map these rows into the shared <code>daily_metrics</code> ingestion contract and use <code>source_record_id</code> or <code>raw_hash</code> for idempotent upserts.</li>
+    <li>Insert into shared daily metrics storage only after schema review. This branch intentionally does not apply Supabase migrations or build app UI.</li>
+    <li>Harden the portal login selectors against any real MedM account differences after testing manually with local credentials.</li>
+  </ol>
+</main>
+</body>
+</html>

@@ -8,6 +8,7 @@ local-data/
 ios/HabitTracker/Resources/SupabaseConfig.plist
 
 # Dependencies and build
+node_modules
 web/node_modules
 web/.next
 web/out

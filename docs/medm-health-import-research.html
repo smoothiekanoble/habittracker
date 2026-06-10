@@ -91,6 +91,36 @@
 node --check scripts/medm-health/test-parse-medm-weight.mjs
 node scripts/medm-health/test-parse-medm-weight.mjs</pre>
 
+  <h2>MedM Health Portal Sync Spike</h2>
+  <p>This branch also includes a local-only Playwright spike for ordering and downloading a MedM Health Portal weight report. It is intentionally dry-run only: it logs report status, CSV discovery, parsed row count, and parsed date range, but does not print body-weight values or write to Supabase.</p>
+
+  <h3>Discovered Portal Flow</h3>
+  <ol>
+    <li>Log in to <code>https://health.medm.com</code> with a MedM user account.</li>
+    <li>Create a report with <code>POST /en/records/:recordId/reports</code>.</li>
+    <li>Submit <code>from_date</code>, <code>to_date</code>, <code>medical_record_id</code>, <code>queue_period=never</code>, <code>measurement_types[]=weight</code>, <code>format=csv</code>, and <code>group_by=type</code>.</li>
+    <li>Read <code>GET /en/records/:recordId/reports</code> and find the newest <code>/download_report?id=...</code> link.</li>
+    <li>Download the ZIP report, extract CSV files locally, and parse each CSV through the MedM body-weight adapter.</li>
+  </ol>
+
+  <h3>Local Usage</h3>
+  <p>Install root dependencies and run a dry run with credentials supplied by environment variables:</p>
+  <pre>npm install
+$env:MEDM_EMAIL="you@example.com"
+$env:MEDM_PASSWORD="..."
+$env:MEDM_RECORD_ID="..."
+npm run medm:sync:dry-run -- --days 30</pre>
+  <p>Downloaded ZIP and CSV files are saved only under <code>local-data/imports/medm-health/</code>. The script does not create Playwright storage-state files, commit cookies, or upload artifacts.</p>
+
+  <h3>GitHub Actions</h3>
+  <p>The workflow <code>.github/workflows/medm-health-sync.yml</code> supports manual runs and a daily cron. It requires these repository secrets:</p>
+  <ul>
+    <li><code>MEDM_EMAIL</code></li>
+    <li><code>MEDM_PASSWORD</code></li>
+    <li><code>MEDM_RECORD_ID</code></li>
+  </ul>
+  <p>The workflow installs Playwright Chromium, runs synthetic parser/helper tests, and runs the portal sync in dry-run mode. It does not upload the downloaded report as an artifact and should not expose raw measurements in logs.</p>
+
   <h2>Data Fields Available</h2>
   <p>For weight, MedM documents Body Mass / Weight plus body composition fields such as body fat percentage, BMI, muscle metrics, water metrics, basal metabolic rate, visceral fat, lean mass, and metabolic age. The first import should only support <code>body_weight</code>, then add BMI/body-fat once a real export format is inspected locally under <code>local-data/</code>.</p>
 
@@ -108,6 +138,7 @@ node scripts/medm-health/test-parse-medm-weight.mjs</pre>
     <li>Do not commit raw body-weight exports, health dumps, cookies, tokens, <code>.env.local</code>, Supabase secrets, or personal measurement data.</li>
     <li>Only synthetic fixtures belong in Git.</li>
     <li>Warnings may echo compact row context for debugging, so treat CLI output from real files as local/private.</li>
+    <li>Portal sync downloads are local dry-run material and belong only under gitignored <code>local-data/</code>.</li>
   </ul>
 
   <h2>Risks and Limitations</h2>
@@ -125,6 +156,7 @@ node scripts/medm-health/test-parse-medm-weight.mjs</pre>
     <li>Add dry-run validation: duplicate detection, units, impossible values, and date parsing.</li>
     <li>After the metrics-platform branch lands, map these rows into the shared <code>daily_metrics</code> ingestion contract and use <code>source_record_id</code> or <code>raw_hash</code> for idempotent upserts.</li>
     <li>Insert into shared daily metrics storage only after schema review. This branch intentionally does not apply Supabase migrations or build app UI.</li>
+    <li>Harden the portal login selectors against any real MedM account differences after testing manually with local credentials.</li>
   </ol>
 </main>
 </body>

@@ -22,6 +22,14 @@
   <h2>Command</h2>
   <pre>node scripts/medm-health/parse-medm-weight-csv.mjs scripts/medm-health/fixtures/synthetic-medm-weight.csv</pre>
 
+  <h2>Portal Dry Run</h2>
+  <pre>npm install
+$env:MEDM_EMAIL="you@example.com"
+$env:MEDM_PASSWORD="..."
+$env:MEDM_RECORD_ID="..."
+npm run medm:sync:dry-run -- --days 30</pre>
+  <p>The portal dry run uses Playwright to order a MedM Health Portal weight CSV report, download the ZIP, extract CSV files under <code>local-data/imports/medm-health/</code>, and parse them without printing body-weight values.</p>
+
   <h2>Output Shape</h2>
   <pre>{
   "date": "YYYY-MM-DD",
@@ -39,6 +47,7 @@
     <li>Keep real exports under <code>local-data/imports/medm-health/</code>.</li>
     <li>Use <code>source_record_id</code> when supplied by the export; otherwise use <code>raw_hash</code> for idempotency.</li>
     <li>Connect to shared <code>daily_metrics</code> only after the metrics-platform branch lands.</li>
+    <li>GitHub Actions requires <code>MEDM_EMAIL</code>, <code>MEDM_PASSWORD</code>, and <code>MEDM_RECORD_ID</code> secrets and currently runs dry-run only.</li>
   </ul>
 </main>
 </body>

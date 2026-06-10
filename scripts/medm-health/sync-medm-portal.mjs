@@ -12,6 +12,48 @@ import { parseMedmWeightCsv } from "./parse-medm-weight-csv.mjs";
 
 const PORTAL_ORIGIN = "https://health.medm.com";
 const IMPORT_ROOT = join("local-data", "imports", "medm-health");
+const DEBUG_ROOT = join(IMPORT_ROOT, "debug");
+
+export const LOGIN_PATHS = [
+  "/en/user/login",
+  "/en",
+  "/user/login",
+  "/en/users/sign_in",
+];
+
+export const EMAIL_LOGIN_SELECTORS = [
+  'input[type="email"]',
+  'input[name="email"]',
+  'input[name="user[email]"]',
+  'input[autocomplete="email"]',
+  'input[autocomplete="username"]',
+  'input[name*="login" i]',
+  'input[name*="username" i]',
+  'input[id*="email" i]',
+  'input[id*="login" i]',
+  'input[id*="username" i]',
+  'input[type="text"]',
+];
+
+export const PASSWORD_SELECTORS = [
+  'input[type="password"]',
+  'input[name="password"]',
+  'input[name="user[password]"]',
+  'input[name*="password" i]',
+  'input[id*="password" i]',
+  'input[autocomplete="current-password"]',
+];
+
+export const SUBMIT_SELECTORS = [
+  'button[type="submit"]',
+  'input[type="submit"]',
+  'input[name="commit"]',
+  'button:has-text("Sign In")',
+  'button:has-text("Log in")',
+  'button:has-text("Sign in")',
+  'input[value="Sign In"]',
+  'input[value="Log in"]',
+];
 
 function usage() {
   return [
@@ -165,28 +207,21 @@ export function summarizeRows(rows) {
 }
 
 async function login(page, email, password, baseUrl) {
-  await page.goto(`${baseUrl}/en/users/sign_in`, { waitUntil: "domcontentloaded" });
-  await fillFirst(page, [
-    'input[type="email"]',
-    'input[name="user[email]"]',
-    'input[name="email"]',
-    'input[id*="email" i]',
-  ], email);
-  await fillFirst(page, [
-    'input[type="password"]',
-    'input[name="user[password]"]',
-    'input[name="password"]',
-    'input[id*="password" i]',
-  ], password);
+  const fields = await findLoginFields(page, baseUrl);
+
+  if (!fields) {
+    const debugPath = await saveLoginDebugArtifact(page, "login-fields-not-found");
+    throw new Error(
+      `Could not find MedM login fields. Debug artifact saved under ${debugPath}.`,
+    );
+  }
+
+  await fields.email.fill(email);
+  await fields.password.fill(password);
 
   await Promise.all([
     page.waitForLoadState("networkidle").catch(() => {}),
-    clickFirst(page, [
-      'button[type="submit"]',
-      'input[type="submit"]',
-      'button:has-text("Log in")',
-      'button:has-text("Sign in")',
-    ]),
+    clickFirst(page, SUBMIT_SELECTORS),
   ]);
 
   const currentUrl = page.url();
@@ -196,17 +231,35 @@ async function login(page, email, password, baseUrl) {
   }
 }
 
-async function fillFirst(page, selectors, value) {
+async function findLoginFields(page, baseUrl) {
+  for (const path of LOGIN_PATHS) {
+    await page.goto(`${baseUrl}${path}`, { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => {});
+
+    const email = await locateFirst(page, EMAIL_LOGIN_SELECTORS);
+    const password = await locateFirst(page, PASSWORD_SELECTORS);
+
+    if (email && password) {
+      return { email, password };
+    }
+  }
+
+  await page.goto(`${baseUrl}${LOGIN_PATHS[0]}`, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle").catch(() => {});
+
+  return null;
+}
+
+async function locateFirst(page, selectors) {
   for (const selector of selectors) {
     const locator = page.locator(selector).first();
 
     if ((await locator.count()) > 0) {
-      await locator.fill(value);
-      return;
+      return locator;
     }
   }
 
-  throw new Error(`Could not find form field. Tried: ${selectors.join(", ")}`);
+  return null;
 }
 
 async function clickFirst(page, selectors) {
@@ -220,6 +273,37 @@ async function clickFirst(page, selectors) {
   }
 
   throw new Error(`Could not find submit control. Tried: ${selectors.join(", ")}`);
+}
+
+async function saveLoginDebugArtifact(page, reason) {
+  mkdirSync(DEBUG_ROOT, { recursive: true });
+  const artifactBase = join(DEBUG_ROOT, `${safeTimestamp()}-${reason}`);
+  const html = sanitizeHtmlForDebug(await page.content());
+  const metadata = [
+    `url: ${page.url()}`,
+    `title: ${await page.title()}`,
+    `reason: ${reason}`,
+  ].join("\n");
+
+  writeFileSync(`${artifactBase}.txt`, `${metadata}\n`);
+  writeFileSync(`${artifactBase}.html`, html);
+  await page.screenshot({ path: `${artifactBase}.png`, fullPage: true });
+
+  return artifactBase;
+}
+
+export function sanitizeHtmlForDebug(html) {
+  return String(html)
+    .replace(
+      /(<input\b[^>]*\b(?:value|data-[^=]+)=["'])[^"']*(["'][^>]*>)/gi,
+      "$1[redacted]$2",
+    )
+    .replace(
+      /(<meta\b[^>]*\b(?:content)=["'])[^"']*(["'][^>]*>)/gi,
+      "$1[redacted]$2",
+    )
+    .replace(/authenticity_token["'][^>]*value=["'][^"']*["']/gi, 'authenticity_token" value="[redacted]"')
+    .replace(/csrf-token["']\s+content=["'][^"']*["']/gi, 'csrf-token" content="[redacted]"');
 }
 
 function extractAuthenticityToken(html) {

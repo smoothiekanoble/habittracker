@@ -2,10 +2,14 @@
 import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import {
+  EMAIL_LOGIN_SELECTORS,
+  LOGIN_PATHS,
+  PASSWORD_SELECTORS,
   extractCsvFilesFromZip,
   findReportLinks,
   localBackfillWindow,
   parseArgs,
+  sanitizeHtmlForDebug,
   summarizeRows,
 } from "./sync-medm-portal.mjs";
 
@@ -13,6 +17,26 @@ const args = parseArgs(["--days", "14", "--headless", "false"]);
 assert.equal(args.days, 14);
 assert.equal(args.headless, false);
 assert.throws(() => parseArgs(["--days", "0"]), /--days/);
+
+assert.equal(LOGIN_PATHS[0], "/en/user/login");
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[type="text"]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name*="login" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name*="username" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[id*="login" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[id*="username" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[autocomplete="username"]'));
+assert.ok(PASSWORD_SELECTORS.includes('input[name*="password" i]'));
+assert.ok(PASSWORD_SELECTORS.includes('input[id*="password" i]'));
+assert.ok(PASSWORD_SELECTORS.includes('input[autocomplete="current-password"]'));
+
+const sanitized = sanitizeHtmlForDebug(`
+  <meta name="csrf-token" content="csrf-secret">
+  <input name="email" value="person@example.com">
+  <input name="password" value="password-secret">
+  <input type="hidden" name="authenticity_token" value="token-secret">
+`);
+assert.doesNotMatch(sanitized, /person@example\.com|password-secret|token-secret|csrf-secret/);
+assert.match(sanitized, /\[redacted\]/);
 
 const window = localBackfillWindow(2, new Date(2026, 5, 10, 12, 30, 0));
 assert.equal(window.localStartDate, "2026-06-09");
@@ -69,4 +93,3 @@ function syntheticZip(name, text) {
 
   return Buffer.concat([header, nameBytes, compressed]);
 }
-

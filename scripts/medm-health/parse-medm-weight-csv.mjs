@@ -1,15 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-
-const [, , inputPath] = process.argv;
-
-if (!inputPath) {
-  console.error(
-    "Usage: node scripts/medm-health/parse-medm-weight-csv.mjs <csv-path>",
-  );
-  process.exit(1);
-}
+import { fileURLToPath } from "node:url";
 
 const DATE_COLUMNS = [
   "date",
@@ -18,6 +10,7 @@ const DATE_COLUMNS = [
   "record date",
   "recorded date",
   "timestamp",
+  "time",
   "date/time",
   "datetime",
   "measurement datetime",
@@ -53,7 +46,7 @@ const SOURCE_DETAIL_COLUMNS = [
   "export source",
 ];
 
-function parseCsv(text) {
+export function parseCsv(text) {
   const rows = [];
   let row = [];
   let field = "";
@@ -99,7 +92,7 @@ function parseCsv(text) {
   return rows.filter((candidate) => candidate.some(Boolean));
 }
 
-function detectDelimiter(text) {
+export function detectDelimiter(text) {
   const [firstLine = ""] = text.replace(/^\uFEFF/, "").split(/\r?\n/, 1);
   const candidates = [",", ";", "\t"];
   const counts = candidates.map((candidate) => ({
@@ -110,7 +103,7 @@ function detectDelimiter(text) {
   return counts.sort((left, right) => right.count - left.count)[0]?.candidate ?? ",";
 }
 
-function countDelimiter(line, delimiter) {
+export function countDelimiter(line, delimiter) {
   let count = 0;
   let quoted = false;
 
@@ -137,13 +130,13 @@ function countDelimiter(line, delimiter) {
   return count;
 }
 
-function headerIndex(headers) {
+export function headerIndex(headers) {
   return new Map(
     headers.map((header, index) => [normalizeHeader(header), index]),
   );
 }
 
-function normalizeHeader(header) {
+export function normalizeHeader(header) {
   return String(header)
     .replace(/^\uFEFF/, "")
     .replace(/\s*\([^)]*\)\s*/g, " ")
@@ -153,7 +146,7 @@ function normalizeHeader(header) {
     .toLowerCase();
 }
 
-function firstValue(row, index, names) {
+export function firstValue(row, index, names) {
   for (const name of names) {
     const column = index.get(normalizeHeader(name));
     if (column !== undefined && row[column] !== undefined && row[column] !== "") {
@@ -164,7 +157,7 @@ function firstValue(row, index, names) {
   return null;
 }
 
-function firstHeaderMatch(headers, names) {
+export function firstHeaderMatch(headers, names) {
   const normalizedNames = names.map(normalizeHeader);
 
   return headers.find((header) => {
@@ -175,13 +168,13 @@ function firstHeaderMatch(headers, names) {
   });
 }
 
-function numericValue(value, delimiter) {
+export function numericValue(value, delimiter) {
   if (value === null || value === "") {
     return null;
   }
 
   const text = String(value).trim();
-  const match = text.match(/[-+]?\d+(?:[,.]\d+)?/);
+  const match = text.match(/[-+]?\d+(?:(?:,\d{3})+)?(?:[,.]\d+)?/);
 
   if (!match) {
     return null;
@@ -189,8 +182,9 @@ function numericValue(value, delimiter) {
 
   const numericText = match[0];
   const hasDecimalComma = /^[-+]?\d+,\d{1,2}$/.test(numericText);
+  const hasThousandsComma = /^[-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(numericText);
   const parsed = Number(
-    delimiter === ";" || hasDecimalComma
+    delimiter === ";" || (hasDecimalComma && !hasThousandsComma)
       ? numericText.replace(",", ".")
       : numericText.replaceAll(",", ""),
   );
@@ -198,7 +192,7 @@ function numericValue(value, delimiter) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function metricDate(dateValue, timeValue) {
+export function metricDate(dateValue, timeValue) {
   if (!dateValue) {
     return null;
   }
@@ -232,11 +226,11 @@ function metricDate(dateValue, timeValue) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function expandYear(year) {
+export function expandYear(year) {
   return year.length === 2 ? `20${year}` : year;
 }
 
-function formatDate(year, month, day) {
+export function formatDate(year, month, day) {
   const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
 
   if (
@@ -250,7 +244,7 @@ function formatDate(year, month, day) {
   return [year.padStart(4, "0"), month.padStart(2, "0"), day.padStart(2, "0")].join("-");
 }
 
-function normalizedUnit(unitValue, valueValue, valueHeader) {
+export function normalizedUnit(unitValue, valueValue, valueHeader) {
   const combined = [unitValue, valueValue, valueHeader]
     .filter(Boolean)
     .join(" ")
@@ -267,7 +261,7 @@ function normalizedUnit(unitValue, valueValue, valueHeader) {
   return null;
 }
 
-function sourceDetail(row, index, timeValue) {
+export function sourceDetail(row, index, timeValue) {
   const details = SOURCE_DETAIL_COLUMNS
     .map((name) => firstValue(row, index, [name]))
     .filter(Boolean);
@@ -279,7 +273,7 @@ function sourceDetail(row, index, timeValue) {
   return details.length > 0 ? details.join("; ") : "medm_weight_csv";
 }
 
-function rowHash(headers, row) {
+export function rowHash(headers, row) {
   const canonical = headers
     .map((header, index) => `${normalizeHeader(header)}=${row[index] ?? ""}`)
     .join("|");
@@ -287,7 +281,19 @@ function rowHash(headers, row) {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-function normalizedRows(text) {
+function rowContext(headers, row) {
+  const context = {};
+
+  headers.forEach((header, index) => {
+    if (row[index] !== undefined && row[index] !== "") {
+      context[header] = row[index];
+    }
+  });
+
+  return context;
+}
+
+export function parseMedmWeightCsv(text) {
   const delimiter = detectDelimiter(text);
   const rows = parseCsv(text);
 
@@ -299,6 +305,7 @@ function normalizedRows(text) {
   const index = headerIndex(headers);
   const valueHeader = firstHeaderMatch(headers, VALUE_COLUMNS);
   const normalized = [];
+  const warnings = [];
 
   if (!valueHeader) {
     throw new Error(
@@ -306,7 +313,8 @@ function normalizedRows(text) {
     );
   }
 
-  for (const row of dataRows) {
+  dataRows.forEach((row, rowIndex) => {
+    const rowNumber = rowIndex + 2;
     const dateValue = firstValue(row, index, DATE_COLUMNS);
     const timeValue = firstValue(row, index, TIME_COLUMNS);
     const date = metricDate(dateValue, timeValue);
@@ -320,8 +328,27 @@ function normalizedRows(text) {
     const sourceRecordId = firstValue(row, index, ID_COLUMNS);
     const rawHash = rowHash(headers, row);
 
-    if (!date || value === null || !unit) {
-      continue;
+    const rowWarnings = [];
+
+    if (!date) {
+      rowWarnings.push("missing or unparseable date");
+    }
+
+    if (value === null) {
+      rowWarnings.push("missing or nonnumeric body weight");
+    }
+
+    if (!unit) {
+      rowWarnings.push("missing or unsupported unit");
+    }
+
+    if (rowWarnings.length > 0) {
+      warnings.push({
+        row_number: rowNumber,
+        reason: rowWarnings.join("; "),
+        row: rowContext(headers, row),
+      });
+      return;
     }
 
     normalized.push({
@@ -333,19 +360,48 @@ function normalizedRows(text) {
       source_detail: sourceDetail(row, index, timeValue),
       ...(sourceRecordId ? { source_record_id: sourceRecordId } : { raw_hash: rawHash }),
     });
+  });
+
+  return { rows: normalized, warnings };
+}
+
+function warningLine(warning) {
+  return `Warning row ${warning.row_number}: ${warning.reason}; row=${JSON.stringify(
+    warning.row,
+  )}`;
+}
+
+export function runCli(argv = process.argv) {
+  const [, , inputPath] = argv;
+
+  if (!inputPath) {
+    console.error(
+      "Usage: node scripts/medm-health/parse-medm-weight-csv.mjs <csv-path>",
+    );
+    return 1;
   }
 
-  return normalized;
+  try {
+    const text = readFileSync(inputPath, "utf8");
+    const result = parseMedmWeightCsv(text);
+
+    for (const warning of result.warnings) {
+      console.error(warningLine(warning));
+    }
+
+    if (result.rows.length === 0) {
+      console.error("No valid MedM body-weight rows were found.");
+      return 1;
+    }
+
+    console.log(JSON.stringify(result.rows, null, 2));
+    return 0;
+  } catch (error) {
+    console.error(error.message);
+    return 1;
+  }
 }
 
-const text = readFileSync(inputPath, "utf8");
-let normalized;
-
-try {
-  normalized = normalizedRows(text);
-} catch (error) {
-  console.error(error.message);
-  process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.exitCode = runCli(process.argv);
 }
-
-console.log(JSON.stringify(normalized, null, 2));

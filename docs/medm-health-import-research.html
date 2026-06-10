@@ -29,7 +29,7 @@
 <main>
   <h1>MedM Health Body Weight Import Research</h1>
   <p class="lede">Feasibility review for importing body-weight readings from MedM Health or a MedM-connected scale into Habit Tracker.</p>
-  <p class="meta">Prepared June 7, 2026. Worktree: <code>codex/medm-health-import</code>.</p>
+  <p class="meta">Prepared June 7, 2026. Implementation updated June 10, 2026. Worktree: <code>codex/medm-health-import</code>.</p>
 
   <section class="callout">
     <h2>Recommendation</h2>
@@ -52,9 +52,11 @@
   <p>For the userâ€™s current iPhone-first v1, make Apple Health the canonical phone-side health hub. Let MedM write weight to Apple Health when possible, then import a user-controlled export from Apple Health or from MedMâ€™s own report/export flow. This avoids depending on MedM credentials inside Habit Tracker.</p>
 
   <h2>Prototype</h2>
-  <p>This spike includes a synthetic CSV parser for weight readings:</p>
+  <p>This branch now includes a source-specific MedM body-weight CSV adapter. It is a local CLI utility only: it performs no Supabase writes, applies no migrations, and builds no dashboard UI.</p>
+  <p>Run it against a synthetic fixture with:</p>
   <pre>node scripts/medm-health/parse-medm-weight-csv.mjs scripts/medm-health/fixtures/synthetic-medm-weight.csv</pre>
-  <p>It emits source-specific adapter rows in the shared normalized metric shape:</p>
+  <p>It prints normalized JSON to stdout and row-level warnings to stderr. Malformed rows are skipped with row numbers and compact row context, while valid rows continue through. If the file has no usable header/data rows or no valid body-weight rows, the CLI exits nonzero.</p>
+  <p>Expected output rows use the shared normalized metric shape:</p>
   <pre>{
   "date": "2026-06-01",
   "metric_type": "body_weight",
@@ -72,11 +74,22 @@
     <li><code>source</code> is always <code>medm_health</code>.</li>
     <li><code>unit</code> is normalized to <code>lb</code> or <code>kg</code> from the unit column, value text, or weight header.</li>
     <li><code>source_detail</code> combines available app, device, export source, and time details.</li>
-    <li><code>source_record_id</code> is used when an export row has an ID; otherwise <code>raw_hash</code> provides stable dry-run idempotency.</li>
+    <li><code>source_record_id</code> is used when an export row has an ID; otherwise <code>raw_hash</code> provides stable dry-run idempotency. Duplicate rows without IDs produce the same hash deterministically.</li>
   </ul>
 
   <h3>Supported Synthetic CSV Variants</h3>
-  <p>The parser currently tolerates comma, semicolon, or tab delimiters; quoted fields; a UTF-8 byte-order mark; ISO dates; U.S. slash dates; day-month-year dotted dates; separate date/time columns; weight values with embedded units; and decimal commas in semicolon-style exports. Rows missing date, numeric weight, or a supported unit are skipped.</p>
+  <p>The parser currently tolerates comma, semicolon, or tab delimiters; quoted fields; a UTF-8 byte-order mark; header variants such as Date, date, Timestamp, Time, Weight, Body Weight, Body Mass, Unit, and Weight Unit; ISO dates; U.S. slash dates; day-month-year dotted dates; separate date/time columns; weight values with embedded units; pounds and kilograms; and decimal commas in semicolon-style exports. Rows missing date, numeric weight, or a supported unit are skipped with warnings.</p>
+
+  <h3>Verification Fixtures</h3>
+  <ul>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-weight.csv</code> covers common pound and mixed-unit rows with explicit record IDs.</li>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-weight-kg.csv</code> covers semicolon-delimited kilogram rows and decimal-comma values.</li>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-weight-malformed.csv</code> covers invalid dates, nonnumeric weights, and unsupported units.</li>
+  </ul>
+  <p>Run parser checks with:</p>
+  <pre>node --check scripts/medm-health/parse-medm-weight-csv.mjs
+node --check scripts/medm-health/test-parse-medm-weight.mjs
+node scripts/medm-health/test-parse-medm-weight.mjs</pre>
 
   <h2>Data Fields Available</h2>
   <p>For weight, MedM documents Body Mass / Weight plus body composition fields such as body fat percentage, BMI, muscle metrics, water metrics, basal metabolic rate, visceral fat, lean mass, and metabolic age. The first import should only support <code>body_weight</code>, then add BMI/body-fat once a real export format is inspected locally under <code>local-data/</code>.</p>
@@ -86,9 +99,16 @@
     <li>Pair the body-weight scale with MedM Health Diary or enter weight manually.</li>
     <li>Enable Apple Health sync for Weight if using Apple Health as the hub.</li>
     <li>Export a weight report/file from MedM or Apple Health.</li>
-    <li>Place the file under <code>local-data/imports/medm-health/</code>.</li>
+    <li>Place real local exports under <code>local-data/imports/medm-health/</code>. The entire <code>local-data/</code> tree is gitignored and should remain private.</li>
     <li>Run a local dry-run importer and review normalized rows before uploading.</li>
   </ol>
+
+  <h2>Privacy Rules</h2>
+  <ul>
+    <li>Do not commit raw body-weight exports, health dumps, cookies, tokens, <code>.env.local</code>, Supabase secrets, or personal measurement data.</li>
+    <li>Only synthetic fixtures belong in Git.</li>
+    <li>Warnings may echo compact row context for debugging, so treat CLI output from real files as local/private.</li>
+  </ul>
 
   <h2>Risks and Limitations</h2>
   <ul>
@@ -104,7 +124,7 @@
     <li>Adapt header aliases to the actual export while keeping only synthetic fixtures in git.</li>
     <li>Add dry-run validation: duplicate detection, units, impossible values, and date parsing.</li>
     <li>After the metrics-platform branch lands, map these rows into the shared <code>daily_metrics</code> ingestion contract and use <code>source_record_id</code> or <code>raw_hash</code> for idempotent upserts.</li>
-    <li>Insert into shared daily metrics storage only after schema review.</li>
+    <li>Insert into shared daily metrics storage only after schema review. This branch intentionally does not apply Supabase migrations or build app UI.</li>
   </ol>
 </main>
 </body>

@@ -30,6 +30,13 @@ $env:MEDM_RECORD_ID="..."
 npm run medm:sync:dry-run -- --days 30</pre>
   <p>The portal dry run uses Playwright to order a MedM Health Portal weight CSV report, download the ZIP, extract CSV files under <code>local-data/imports/medm-health/</code>, and parse them without printing body-weight values.</p>
 
+  <h2>Import</h2>
+  <pre>$env:SUPABASE_URL="https://..."
+$env:SUPABASE_SERVICE_ROLE_KEY="..."
+$env:SUPABASE_METRICS_USER_ID="auth-user-uuid"
+npm run medm:sync:import -- --days 30</pre>
+  <p>Import requires the <code>daily_metrics</code> migration to be applied first. It upserts body-weight rows only and remains server/local automation, not client-side code.</p>
+
   <h2>Output Shape</h2>
   <pre>{
   "date": "YYYY-MM-DD",
@@ -46,8 +53,8 @@ npm run medm:sync:dry-run -- --days 30</pre>
     <li>Use only synthetic fixtures in Git.</li>
     <li>Keep real exports under <code>local-data/imports/medm-health/</code>.</li>
     <li>Use <code>source_record_id</code> when supplied by the export; otherwise use <code>raw_hash</code> for idempotency.</li>
-    <li>Connect to shared <code>daily_metrics</code> only after the metrics-platform branch lands.</li>
-    <li>GitHub Actions requires <code>MEDM_EMAIL</code>, <code>MEDM_PASSWORD</code>, and <code>MEDM_RECORD_ID</code> secrets and currently runs dry-run only.</li>
+    <li>Apply the <code>daily_metrics</code> migration before running a real import.</li>
+    <li>GitHub Actions requires <code>MEDM_EMAIL</code>, <code>MEDM_PASSWORD</code>, and <code>MEDM_RECORD_ID</code> secrets for dry-run. Manual import also requires Supabase import secrets and <code>SUPABASE_METRICS_USER_ID</code>.</li>
   </ul>
 </main>
 </body>

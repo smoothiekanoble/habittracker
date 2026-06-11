@@ -1,0 +1,9 @@
+MedM Health Portal Report
+Medical Record,Synthetic Record
+Report Type,Weight
+
+Weight
+Measurement Type,Measured At,Result,Units,Device Name,Source
+Weight,2026-06-08 07:01,180.4,lb,Synthetic Portal Scale,MedM Health Portal
+Weight,2026-06-09 07:03,180.2,lb,Synthetic Portal Scale,MedM Health Portal
+Weight,2026-06-10 07:05,81.6,kg,Synthetic Portal Scale,MedM Health Portal

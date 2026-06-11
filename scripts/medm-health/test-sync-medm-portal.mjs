@@ -2,17 +2,103 @@
 import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import {
+  EMAIL_LOGIN_SELECTORS,
+  LOGIN_PATHS,
+  PASSWORD_SELECTORS,
+  dailyMetricPayload,
+  dailyMetricPayloads,
+  dedupeDailyMetricRows,
   extractCsvFilesFromZip,
   findReportLinks,
   localBackfillWindow,
   parseArgs,
+  sanitizeHtmlForDebug,
+  summarizeParsedFiles,
   summarizeRows,
 } from "./sync-medm-portal.mjs";
 
 const args = parseArgs(["--days", "14", "--headless", "false"]);
 assert.equal(args.days, 14);
 assert.equal(args.headless, false);
+assert.equal(args.dryRun, true);
+assert.equal(parseArgs(["--import"]).dryRun, false);
+assert.equal(parseArgs(["--dry-run", "false"]).dryRun, false);
 assert.throws(() => parseArgs(["--days", "0"]), /--days/);
+
+assert.equal(LOGIN_PATHS[0], "/en/user/login");
+assert.deepEqual(LOGIN_PATHS, [
+  "/en/user/login",
+  "/en",
+  "/en/users/sign_in",
+]);
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[type="text"]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name="login"]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name="username"]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[id*="login" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[id*="username" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[autocomplete="email"]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[autocomplete="username"]'));
+assert.ok(PASSWORD_SELECTORS.includes('input[name="password"]'));
+assert.ok(PASSWORD_SELECTORS.includes('input[id*="password" i]'));
+assert.ok(PASSWORD_SELECTORS.includes('input[autocomplete="current-password"]'));
+
+const sanitized = sanitizeHtmlForDebug(`
+  <meta name="csrf-token" content="csrf-secret">
+  <input name="email" value="person@example.com">
+  <input name="password" value="password-secret">
+  <input type="hidden" name="authenticity_token" value="token-secret">
+`);
+assert.doesNotMatch(sanitized, /person@example\.com|password-secret|token-secret|csrf-secret/);
+assert.match(sanitized, /\[redacted\]/);
+
+const metricPayload = dailyMetricPayload(
+  sampleMetricRow(),
+  "00000000-0000-0000-0000-000000000001",
+);
+assert.deepEqual(metricPayload, {
+  user_id: "00000000-0000-0000-0000-000000000001",
+  metric_date: "2026-06-10",
+  metric_type: "body_weight",
+  value: 180.1,
+  unit: "lb",
+  source: "medm_health",
+  source_detail: {
+    detail: "MedM Health CSV; time 07:01",
+    raw_hash: "abc123",
+  },
+});
+assert.deepEqual(dailyMetricPayloads([sampleMetricRow()], "user-1"), [
+  {
+    user_id: "user-1",
+    metric_date: "2026-06-10",
+    metric_type: "body_weight",
+    value: 180.1,
+    unit: "lb",
+    source: "medm_health",
+    source_detail: {
+      detail: "MedM Health CSV; time 07:01",
+      raw_hash: "abc123",
+    },
+  },
+]);
+const duplicateDailyRows = [
+  { ...sampleMetricRow(), source_detail: "MedM Health CSV; time 07:01", raw_hash: "a" },
+  { ...sampleMetricRow(), source_detail: "MedM Health CSV; time 07:05", raw_hash: "b" },
+];
+assert.equal(dedupeDailyMetricRows(duplicateDailyRows).length, 1);
+assert.equal(dailyMetricPayloads(duplicateDailyRows, "user-1").length, 1);
+
+function sampleMetricRow() {
+  return {
+    date: "2026-06-10",
+    metric_type: "body_weight",
+    value: 180.1,
+    unit: "lb",
+    source: "medm_health",
+    source_detail: "MedM Health CSV; time 07:01",
+    raw_hash: "abc123",
+  };
+}
 
 const window = localBackfillWindow(2, new Date(2026, 5, 10, 12, 30, 0));
 assert.equal(window.localStartDate, "2026-06-09");
@@ -48,6 +134,22 @@ assert.deepEqual(
   },
 );
 
+assert.deepEqual(
+  summarizeParsedFiles([
+    {
+      rows: duplicateDailyRows,
+      warnings: [{ reason: "synthetic" }],
+    },
+  ]),
+  {
+    rowCount: 2,
+    dateRange: "2026-06-10 to 2026-06-10",
+    warningCount: 1,
+    fileCount: 1,
+    uniqueDailyMetricCount: 1,
+  },
+);
+
 console.log("MedM portal sync helper tests passed.");
 
 function syntheticZip(name, text) {
@@ -69,4 +171,3 @@ function syntheticZip(name, text) {
 
   return Buffer.concat([header, nameBytes, compressed]);
 }
-

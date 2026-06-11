@@ -7,6 +7,10 @@ on:
         description: "Backfill window in local days"
         required: false
         default: "30"
+      dry_run:
+        description: "Run without writing to Supabase"
+        required: false
+        default: "true"
   schedule:
     - cron: "17 10 * * *"
 
@@ -20,6 +24,9 @@ jobs:
       MEDM_RECORD_ID: ${{ secrets.MEDM_RECORD_ID }}
       MEDM_SYNC_TIMEOUT_SECONDS: "180"
       MEDM_SYNC_POLL_SECONDS: "10"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_METRICS_USER_ID: ${{ vars.SUPABASE_METRICS_USER_ID }}
     steps:
       - name: Check required secrets
         shell: bash
@@ -44,4 +51,26 @@ jobs:
         run: npm run test:medm
 
       - name: Dry-run MedM portal sync
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.dry_run != 'false' }}
         run: npm run medm:sync:dry-run -- --days "${{ github.event.inputs.days || '30' }}"
+
+      - name: Import MedM portal sync
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false' }}
+        shell: bash
+        run: |
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          test -n "$SUPABASE_METRICS_USER_ID"
+          npm run medm:sync:import -- --days "${{ github.event.inputs.days || '30' }}"
+
+      - name: Upload MedM login debug artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: medm-login-debug
+          path: |
+            local-data/imports/medm-health/debug/login-page.html
+            local-data/imports/medm-health/debug/login-page.png
+            local-data/imports/medm-health/debug/login-page.txt
+          if-no-files-found: ignore
+          retention-days: 3

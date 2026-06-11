@@ -12,12 +12,53 @@ import { parseMedmWeightCsv } from "./parse-medm-weight-csv.mjs";
 
 const PORTAL_ORIGIN = "https://health.medm.com";
 const IMPORT_ROOT = join("local-data", "imports", "medm-health");
+const DEBUG_ROOT = join(IMPORT_ROOT, "debug");
+
+export const LOGIN_PATHS = [
+  "/en/user/login",
+  "/en",
+  "/en/users/sign_in",
+];
+
+export const EMAIL_LOGIN_SELECTORS = [
+  'input[type="email"]',
+  'input[name="user[email]"]',
+  'input[name="email"]',
+  'input[name="login"]',
+  'input[name="username"]',
+  'input[autocomplete="email"]',
+  'input[autocomplete="username"]',
+  'input[id*="email" i]',
+  'input[id*="login" i]',
+  'input[id*="username" i]',
+  'input[type="text"]',
+];
+
+export const PASSWORD_SELECTORS = [
+  'input[type="password"]',
+  'input[name="user[password]"]',
+  'input[name="password"]',
+  'input[autocomplete="current-password"]',
+  'input[id*="password" i]',
+];
+
+export const SUBMIT_SELECTORS = [
+  'button[type="submit"]',
+  'input[type="submit"]',
+  'input[name="commit"]',
+  'button:has-text("Sign In")',
+  'button:has-text("Log in")',
+  'button:has-text("Sign in")',
+  'input[value="Sign In"]',
+  'input[value="Log in"]',
+];
 
 function usage() {
   return [
-    "Usage: node scripts/medm-health/sync-medm-portal.mjs [--days 30] [--headless true|false]",
+    "Usage: node scripts/medm-health/sync-medm-portal.mjs [--days 30] [--headless true|false] [--import]",
     "",
     "Required env vars: MEDM_EMAIL, MEDM_PASSWORD, MEDM_RECORD_ID",
+    "Import env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_METRICS_USER_ID",
     "Optional env vars: MEDM_BASE_URL, MEDM_SYNC_TIMEOUT_SECONDS, MEDM_SYNC_POLL_SECONDS",
   ].join("\n");
 }
@@ -26,6 +67,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     days: 30,
     headless: true,
+    dryRun: true,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -38,6 +80,11 @@ export function parseArgs(argv = process.argv.slice(2)) {
     } else if (arg === "--headless") {
       options.headless = value !== "false";
       index += 1;
+    } else if (arg === "--dry-run") {
+      options.dryRun = value !== "false";
+      index += 1;
+    } else if (arg === "--import") {
+      options.dryRun = false;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
     } else {
@@ -50,6 +97,58 @@ export function parseArgs(argv = process.argv.slice(2)) {
   }
 
   return options;
+}
+
+export function dailyMetricPayload(row, userId) {
+  const sourceDetail = {
+    detail: row.source_detail ?? null,
+    source_record_id: row.source_record_id ?? null,
+    raw_hash: row.raw_hash ?? null,
+  };
+
+  return {
+    user_id: userId,
+    metric_date: row.date,
+    metric_type: row.metric_type,
+    value: row.value,
+    unit: row.unit,
+    source: row.source,
+    source_detail: Object.fromEntries(
+      Object.entries(sourceDetail).filter(([, value]) => value !== null),
+    ),
+  };
+}
+
+export function dailyMetricPayloads(rows, userId) {
+  return dedupeDailyMetricRows(rows).map((row) => dailyMetricPayload(row, userId));
+}
+
+export function dedupeDailyMetricRows(rows) {
+  const sortedRows = [...rows].sort((left, right) =>
+    stableMetricRowSortKey(left).localeCompare(stableMetricRowSortKey(right)),
+  );
+  const byDailyMetric = new Map();
+
+  for (const row of sortedRows) {
+    byDailyMetric.set(metricRowKey(row), row);
+  }
+
+  return [...byDailyMetric.values()];
+}
+
+function metricRowKey(row) {
+  return [row.date, row.metric_type, row.source].join("|");
+}
+
+function stableMetricRowSortKey(row) {
+  return [
+    row.date,
+    row.metric_type,
+    row.source,
+    row.source_detail ?? "",
+    row.source_record_id ?? "",
+    row.raw_hash ?? "",
+  ].join("|");
 }
 
 export function localBackfillWindow(days, now = new Date()) {
@@ -164,29 +263,36 @@ export function summarizeRows(rows) {
   };
 }
 
+export function summarizeParsedFiles(parsedFiles) {
+  const rows = parsedFiles.flatMap((file) => file.rows);
+  const warnings = parsedFiles.reduce((total, file) => total + file.warnings.length, 0);
+  const summary = summarizeRows(rows);
+
+  return {
+    rowCount: summary.rowCount,
+    dateRange: summary.dateRange,
+    warningCount: warnings,
+    fileCount: parsedFiles.length,
+    uniqueDailyMetricCount: dedupeDailyMetricRows(rows).length,
+  };
+}
+
 async function login(page, email, password, baseUrl) {
-  await page.goto(`${baseUrl}/en/users/sign_in`, { waitUntil: "domcontentloaded" });
-  await fillFirst(page, [
-    'input[type="email"]',
-    'input[name="user[email]"]',
-    'input[name="email"]',
-    'input[id*="email" i]',
-  ], email);
-  await fillFirst(page, [
-    'input[type="password"]',
-    'input[name="user[password]"]',
-    'input[name="password"]',
-    'input[id*="password" i]',
-  ], password);
+  const fields = await findLoginFields(page, baseUrl);
+
+  if (!fields) {
+    const debugPath = await saveLoginDebugArtifact(page, "login-fields-not-found");
+    throw new Error(
+      `Could not find MedM login fields. Debug artifact saved under ${debugPath}.`,
+    );
+  }
+
+  await fields.email.fill(email);
+  await fields.password.fill(password);
 
   await Promise.all([
     page.waitForLoadState("networkidle").catch(() => {}),
-    clickFirst(page, [
-      'button[type="submit"]',
-      'input[type="submit"]',
-      'button:has-text("Log in")',
-      'button:has-text("Sign in")',
-    ]),
+    clickFirst(page, SUBMIT_SELECTORS),
   ]);
 
   const currentUrl = page.url();
@@ -196,17 +302,37 @@ async function login(page, email, password, baseUrl) {
   }
 }
 
-async function fillFirst(page, selectors, value) {
+async function findLoginFields(page, baseUrl) {
+  for (const path of LOGIN_PATHS) {
+    await page.goto(`${baseUrl}${path}`, { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await logPageLocation(page, `Checking MedM login page ${path}`);
+
+    const email = await locateFirst(page, EMAIL_LOGIN_SELECTORS);
+    const password = await locateFirst(page, PASSWORD_SELECTORS);
+
+    if (email && password) {
+      return { email, password };
+    }
+  }
+
+  await page.goto(`${baseUrl}${LOGIN_PATHS[0]}`, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await logPageLocation(page, "Saving MedM login debug artifacts from primary login page");
+
+  return null;
+}
+
+async function locateFirst(page, selectors) {
   for (const selector of selectors) {
     const locator = page.locator(selector).first();
 
     if ((await locator.count()) > 0) {
-      await locator.fill(value);
-      return;
+      return locator;
     }
   }
 
-  throw new Error(`Could not find form field. Tried: ${selectors.join(", ")}`);
+  return null;
 }
 
 async function clickFirst(page, selectors) {
@@ -220,6 +346,40 @@ async function clickFirst(page, selectors) {
   }
 
   throw new Error(`Could not find submit control. Tried: ${selectors.join(", ")}`);
+}
+
+async function logPageLocation(page, label) {
+  console.log(`${label}: url=${page.url()} title=${await page.title()}`);
+}
+
+async function saveLoginDebugArtifact(page, reason) {
+  mkdirSync(DEBUG_ROOT, { recursive: true });
+  const html = sanitizeHtmlForDebug(await page.content());
+  const metadata = [
+    `url: ${page.url()}`,
+    `title: ${await page.title()}`,
+    `reason: ${reason}`,
+  ].join("\n");
+
+  writeFileSync(join(DEBUG_ROOT, "login-page.txt"), `${metadata}\n`);
+  writeFileSync(join(DEBUG_ROOT, "login-page.html"), html);
+  await page.screenshot({ path: join(DEBUG_ROOT, "login-page.png"), fullPage: true });
+
+  return DEBUG_ROOT;
+}
+
+export function sanitizeHtmlForDebug(html) {
+  return String(html)
+    .replace(
+      /(<input\b[^>]*\b(?:value|data-[^=]+)=["'])[^"']*(["'][^>]*>)/gi,
+      "$1[redacted]$2",
+    )
+    .replace(
+      /(<meta\b[^>]*\b(?:content)=["'])[^"']*(["'][^>]*>)/gi,
+      "$1[redacted]$2",
+    )
+    .replace(/authenticity_token["'][^>]*value=["'][^"']*["']/gi, 'authenticity_token" value="[redacted]"')
+    .replace(/csrf-token["']\s+content=["'][^"']*["']/gi, 'csrf-token" content="[redacted]"');
 }
 
 function extractAuthenticityToken(html) {
@@ -312,6 +472,44 @@ async function downloadReport(context, baseUrl, link) {
   return Buffer.from(await response.body());
 }
 
+async function upsertDailyMetrics(rows, env) {
+  const missing = [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_METRICS_USER_ID",
+  ].filter((name) => !env[name]);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing import env vars: ${missing.join(", ")}`);
+  }
+
+  if (rows.length === 0) {
+    return { upsertedRows: 0 };
+  }
+
+  const payloads = dailyMetricPayloads(rows, env.SUPABASE_METRICS_USER_ID);
+  const url = new URL("/rest/v1/daily_metrics", env.SUPABASE_URL);
+  url.searchParams.set("on_conflict", "user_id,metric_date,metric_type,source");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(payloads),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`daily_metrics upsert failed with HTTP ${response.status}: ${errorText}`);
+  }
+
+  return { upsertedRows: payloads.length };
+}
+
 function ensureImportDir() {
   mkdirSync(IMPORT_ROOT, { recursive: true });
   return IMPORT_ROOT;
@@ -364,6 +562,7 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
   const window = localBackfillWindow(options.days);
   const sessionId = safeTimestamp();
   const importDir = ensureImportDir();
+  const parsedFiles = [];
 
   try {
     const { chromium } = await import("playwright");
@@ -406,23 +605,53 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
         writeFileSync(csvPath, csvFile.text);
         const parsed = parseMedmWeightCsv(csvFile.text);
         const summary = summarizeRows(parsed.rows);
+        parsedFiles.push({
+          path: csvPath,
+          rows: parsed.rows,
+          warnings: parsed.warnings,
+        });
 
         console.log(`CSV file found: ${csvPath}`);
         console.log(`Parsed rows: ${summary.rowCount}`);
         console.log(`Parsed date range: ${summary.dateRange}`);
+        console.log(
+          "Normalized fields: date, metric_type, value, unit, source, source_detail.",
+        );
 
         if (parsed.warnings.length > 0) {
           console.log(`Parser warnings: ${parsed.warnings.length}`);
+          for (const reason of warningReasons(parsed.warnings)) {
+            console.log(`Parser warning reason: ${reason}`);
+          }
+        }
+
+        if (parsed.rows.length === 0) {
+          console.log(`CSV headers: ${parsed.header_names.join(", ")}`);
         }
       }
     } finally {
       await browser.close();
     }
 
-    if (!existsSync(join("supabase", "migrations"))) {
-      console.log("TODO: add daily_metrics upsert after the shared metrics schema lands.");
+    const totalSummary = summarizeParsedFiles(parsedFiles);
+
+    if (totalSummary.rowCount === 0) {
+      throw new Error("No valid MedM body-weight rows were parsed from the downloaded report.");
+    }
+
+    console.log(
+      `MedM weight sync summary: ${totalSummary.rowCount} rows across ${totalSummary.fileCount} CSV file(s), ${totalSummary.dateRange}.`,
+    );
+
+    if (options.dryRun) {
+      console.log(`Unique daily metric rows ready for upsert: ${totalSummary.uniqueDailyMetricCount}`);
+      console.log("Dry run only. Pass --import to upsert into daily_metrics.");
+    } else if (!existsSync(join("supabase", "migrations"))) {
+      throw new Error("Cannot import because supabase/migrations is missing.");
     } else {
-      console.log("Dry run only. TODO: wire parsed rows into daily_metrics after schema review.");
+      const rows = dedupeDailyMetricRows(parsedFiles.flatMap((file) => file.rows));
+      const result = await upsertDailyMetrics(rows, env);
+      console.log(`Imported rows into daily_metrics: ${result.upsertedRows}`);
     }
 
     return 0;
@@ -430,6 +659,10 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
     console.error(error.message);
     return 1;
   }
+}
+
+function warningReasons(warnings) {
+  return [...new Set(warnings.map((warning) => warning.reason))];
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

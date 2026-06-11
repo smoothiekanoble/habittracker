@@ -9,8 +9,14 @@ const DATE_COLUMNS = [
   "reading date",
   "record date",
   "recorded date",
+  "measured at",
+  "measurement timestamp",
+  "measurement time stamp",
+  "recorded at",
   "timestamp",
   "time",
+  "date & time",
+  "date & time local time",
   "date/time",
   "datetime",
   "measurement datetime",
@@ -25,17 +31,44 @@ const TIME_COLUMNS = [
   "recorded time",
 ];
 
+const TYPE_COLUMNS = [
+  "type",
+  "measurement type",
+  "metric type",
+  "parameter",
+  "indicator",
+  "measurement",
+];
+
 const VALUE_COLUMNS = [
   "weight",
   "body weight",
   "body mass",
   "mass",
   "value",
+  "result",
+  "result value",
+  "measurement value",
+  "reading",
+  "reading value",
   "weight value",
   "bodyweight",
 ];
 
-const UNIT_COLUMNS = ["unit", "units", "weight unit", "body weight unit"];
+const UNIT_COLUMNS = [
+  "unit",
+  "units",
+  "uom",
+  "measure",
+  "measurement unit",
+  "measurement units",
+  "result unit",
+  "result units",
+  "value unit",
+  "value units",
+  "weight unit",
+  "body weight unit",
+];
 const ID_COLUMNS = ["id", "record id", "record_id", "source id", "uuid"];
 const SOURCE_DETAIL_COLUMNS = [
   "source",
@@ -44,6 +77,8 @@ const SOURCE_DETAIL_COLUMNS = [
   "device name",
   "measurement source",
   "export source",
+  "medical record",
+  "record",
 ];
 
 export function parseCsv(text) {
@@ -168,6 +203,39 @@ export function firstHeaderMatch(headers, names) {
   });
 }
 
+function firstHeaderIndex(headers, names) {
+  const normalizedNames = names.map(normalizeHeader);
+
+  return headers.findIndex((header) => {
+    const normalized = normalizeHeader(header);
+    return normalizedNames.some(
+      (name) => normalized === name || normalized.startsWith(`${name} `),
+    );
+  });
+}
+
+function findHeaderRow(rows) {
+  let best = { index: 0, score: -1 };
+
+  rows.forEach((row, index) => {
+    const score =
+      headerScore(row, DATE_COLUMNS) +
+      headerScore(row, VALUE_COLUMNS) +
+      headerScore(row, UNIT_COLUMNS) +
+      headerScore(row, TYPE_COLUMNS);
+
+    if (score > best.score) {
+      best = { index, score };
+    }
+  });
+
+  return best.score >= 2 ? best.index : 0;
+}
+
+function headerScore(row, names) {
+  return firstHeaderIndex(row, names) >= 0 ? 1 : 0;
+}
+
 export function numericValue(value, delimiter) {
   if (value === null || value === "") {
     return null;
@@ -261,6 +329,17 @@ export function normalizedUnit(unitValue, valueValue, valueHeader) {
   return null;
 }
 
+function isWeightRow(row, index, sectionLabel) {
+  const typeValue = firstValue(row, index, TYPE_COLUMNS);
+  const combined = [typeValue, sectionLabel].filter(Boolean).join(" ").toLowerCase();
+
+  if (!combined) {
+    return true;
+  }
+
+  return /\b(weight|body weight|body mass|mass)\b/.test(combined);
+}
+
 export function sourceDetail(row, index, timeValue) {
   const details = SOURCE_DETAIL_COLUMNS
     .map((name) => firstValue(row, index, [name]))
@@ -281,16 +360,16 @@ export function rowHash(headers, row) {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-function rowContext(headers, row) {
-  const context = {};
+function inferredSectionLabel(rows, headerRowIndex) {
+  for (let index = headerRowIndex - 1; index >= 0; index -= 1) {
+    const row = rows[index].filter(Boolean);
 
-  headers.forEach((header, index) => {
-    if (row[index] !== undefined && row[index] !== "") {
-      context[header] = row[index];
+    if (row.length === 1) {
+      return row[0];
     }
-  });
+  }
 
-  return context;
+  return null;
 }
 
 export function parseMedmWeightCsv(text) {
@@ -301,20 +380,24 @@ export function parseMedmWeightCsv(text) {
     throw new Error("CSV must contain a header row and at least one data row.");
   }
 
-  const [headers, ...dataRows] = rows;
+  const headerRowIndex = findHeaderRow(rows);
+  const headers = rows[headerRowIndex];
+  const dataRows = rows.slice(headerRowIndex + 1);
+  const sectionLabel = inferredSectionLabel(rows, headerRowIndex);
   const index = headerIndex(headers);
   const valueHeader = firstHeaderMatch(headers, VALUE_COLUMNS);
   const normalized = [];
   const warnings = [];
+  const headerNames = headers.map((header) => String(header).replace(/^\uFEFF/, "").trim());
 
   if (!valueHeader) {
     throw new Error(
-      `CSV must contain a body-weight column. Tried: ${VALUE_COLUMNS.join(", ")}.`,
+      `CSV must contain a body-weight value column. Headers: ${headerNames.join(", ")}. Tried: ${VALUE_COLUMNS.join(", ")}.`,
     );
   }
 
   dataRows.forEach((row, rowIndex) => {
-    const rowNumber = rowIndex + 2;
+    const rowNumber = headerRowIndex + rowIndex + 2;
     const dateValue = firstValue(row, index, DATE_COLUMNS);
     const timeValue = firstValue(row, index, TIME_COLUMNS);
     const date = metricDate(dateValue, timeValue);
@@ -329,6 +412,10 @@ export function parseMedmWeightCsv(text) {
     const rawHash = rowHash(headers, row);
 
     const rowWarnings = [];
+
+    if (!isWeightRow(row, index, sectionLabel)) {
+      return;
+    }
 
     if (!date) {
       rowWarnings.push("missing or unparseable date");
@@ -346,7 +433,6 @@ export function parseMedmWeightCsv(text) {
       warnings.push({
         row_number: rowNumber,
         reason: rowWarnings.join("; "),
-        row: rowContext(headers, row),
       });
       return;
     }
@@ -362,13 +448,11 @@ export function parseMedmWeightCsv(text) {
     });
   });
 
-  return { rows: normalized, warnings };
+  return { rows: normalized, warnings, header_names: headerNames };
 }
 
 function warningLine(warning) {
-  return `Warning row ${warning.row_number}: ${warning.reason}; row=${JSON.stringify(
-    warning.row,
-  )}`;
+  return `Warning row ${warning.row_number}: ${warning.reason}`;
 }
 
 export function runCli(argv = process.argv) {
@@ -384,6 +468,10 @@ export function runCli(argv = process.argv) {
   try {
     const text = readFileSync(inputPath, "utf8");
     const result = parseMedmWeightCsv(text);
+
+    if (result.warnings.length > 0 || result.rows.length === 0) {
+      console.error(`CSV headers: ${result.header_names.join(", ")}`);
+    }
 
     for (const warning of result.warnings) {
       console.error(warningLine(warning));

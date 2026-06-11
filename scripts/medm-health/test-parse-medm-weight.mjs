@@ -15,6 +15,8 @@ function readFixture(name) {
 
 function assertMetricShape(row) {
   assert.match(row.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(row.metric_date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(row.occurred_at, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(row.metric_type, "body_weight");
   assert.equal(row.source, "medm_health");
   assert.equal(typeof row.value, "number");
@@ -72,10 +74,21 @@ assert.ok(realPortalHeaders.header_names.includes("Date & Time (Local Time)"));
 assert.ok(realPortalHeaders.header_names.includes("Measurement units"));
 assert.equal(realPortalHeaders.rows[0].source_record_id, "synthetic-medm-real-001");
 assert.equal(realPortalHeaders.rows[0].date, "2026-06-11");
+assert.equal(realPortalHeaders.rows[0].metric_date, "2026-06-11");
+assert.match(realPortalHeaders.rows[0].occurred_at, /^2026-06-11T/);
 assert.equal(realPortalHeaders.rows[0].unit, "lb");
 assert.equal(realPortalHeaders.rows[1].unit, "lb");
 assert.equal(realPortalHeaders.rows[2].unit, "kg");
 assert.match(realPortalHeaders.rows[0].source_detail, /Synthetic Portal Scale/);
+
+const sameDay = parseMedmWeightCsv(
+  readFixture("synthetic-medm-portal-same-day-weight.csv"),
+);
+assert.equal(sameDay.warnings.length, 0);
+assert.equal(sameDay.rows.length, 2);
+sameDay.rows.forEach(assertMetricShape);
+assert.equal(sameDay.rows[0].metric_date, sameDay.rows[1].metric_date);
+assert.notEqual(sameDay.rows[0].source_record_id, sameDay.rows[1].source_record_id);
 
 const malformed = parseMedmWeightCsv(
   readFixture("synthetic-medm-weight-malformed.csv"),

@@ -56,9 +56,10 @@
   <p>Run it against a synthetic fixture with:</p>
   <pre>node scripts/medm-health/parse-medm-weight-csv.mjs scripts/medm-health/fixtures/synthetic-medm-weight.csv</pre>
   <p>It prints normalized JSON to stdout and row-level warnings to stderr. Malformed rows are skipped with row numbers and compact row context, while valid rows continue through. If the file has no usable header/data rows or no valid body-weight rows, the CLI exits nonzero.</p>
-  <p>Expected output rows use the shared normalized metric shape:</p>
+  <p>Expected output rows use the shared normalized metric event shape:</p>
   <pre>{
-  "date": "2026-06-01",
+  "occurred_at": "2026-06-01T07:15:00.000Z",
+  "metric_date": "2026-06-01",
   "metric_type": "body_weight",
   "value": 181.8,
   "unit": "lb",
@@ -68,7 +69,7 @@
 }</pre>
 
   <h2>Parser Contract</h2>
-  <p>The parser is adapter-only and performs no database writes. It accepts synthetic MedM-style CSV exports and emits JSON rows shaped as <code>{ date, metric_type, value, unit, source, source_detail?, source_record_id?, raw_hash? }</code>.</p>
+  <p>The parser is adapter-only and performs no database writes. It accepts synthetic MedM-style CSV exports and emits JSON rows shaped as <code>{ occurred_at, metric_date, date, metric_type, value, unit, source, source_detail?, source_record_id?, raw_metadata? }</code>. The legacy <code>date</code> field remains as an alias of <code>metric_date</code> for older tests and helper code.</p>
   <ul>
     <li><code>metric_type</code> is always <code>body_weight</code>.</li>
     <li><code>source</code> is always <code>medm_health</code>.</li>
@@ -78,13 +79,15 @@
   </ul>
 
   <h3>Supported Synthetic CSV Variants</h3>
-  <p>The parser currently tolerates comma, semicolon, or tab delimiters; quoted fields; a UTF-8 byte-order mark; header variants such as Date, date, Timestamp, Time, Weight, Body Weight, Body Mass, Unit, and Weight Unit; ISO dates; U.S. slash dates; day-month-year dotted dates; separate date/time columns; weight values with embedded units; pounds and kilograms; and decimal commas in semicolon-style exports. Rows missing date, numeric weight, or a supported unit are skipped with warnings.</p>
+  <p>The parser currently tolerates comma, semicolon, or tab delimiters; quoted fields; a UTF-8 byte-order mark; header variants such as Date, Date &amp; Time (Local Time), Timestamp, Time, Weight, Body Weight, Body Mass, Unit, Measurement units, and Weight Unit; ISO dates; U.S. slash dates; day-month-year dotted dates; separate date/time columns; weight values with embedded units; pounds and kilograms; and decimal commas in semicolon-style exports. Rows missing date, numeric weight, or a supported unit are skipped with warnings.</p>
 
   <h3>Verification Fixtures</h3>
   <ul>
     <li><code>scripts/medm-health/fixtures/synthetic-medm-weight.csv</code> covers common pound and mixed-unit rows with explicit record IDs.</li>
     <li><code>scripts/medm-health/fixtures/synthetic-medm-weight-kg.csv</code> covers semicolon-delimited kilogram rows and decimal-comma values.</li>
     <li><code>scripts/medm-health/fixtures/synthetic-medm-weight-malformed.csv</code> covers invalid dates, nonnumeric weights, and unsupported units.</li>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-portal-real-headers.csv</code> covers the observed MedM portal export header layout.</li>
+    <li><code>scripts/medm-health/fixtures/synthetic-medm-portal-same-day-weight.csv</code> covers multiple same-day weigh-ins.</li>
   </ul>
   <p>Run parser checks with:</p>
   <pre>node --check scripts/medm-health/parse-medm-weight-csv.mjs
@@ -113,15 +116,15 @@ npm run medm:sync:dry-run -- --days 30</pre>
   <p>Downloaded ZIP and CSV files are saved only under <code>local-data/imports/medm-health/</code>. The script does not create Playwright storage-state files, commit cookies, or upload artifacts.</p>
 
   <h3>Real Import</h3>
-  <p>Dry-run is the default. A real import requires the Supabase migration <code>20260610000000_create_daily_metrics.sql</code> to be applied first, then an explicit import command:</p>
+  <p>Dry-run is the default. A real import requires the Supabase migrations <code>20260610000000_create_daily_metrics.sql</code> and <code>20260610001000_create_metric_events.sql</code> to be applied first, then an explicit import command:</p>
   <pre>$env:SUPABASE_URL="https://..."
 $env:SUPABASE_SERVICE_ROLE_KEY="..."
 $env:SUPABASE_METRICS_USER_ID="auth-user-uuid"
-npm run medm:sync:import -- --days 30</pre>
-  <p>The import maps MedM weight rows into <code>daily_metrics</code> and upserts on <code>user_id, metric_date, metric_type, source</code>. If a report contains multiple MedM weight rows for the same day, the importer collapses them deterministically to one daily row before upsert. It imports <code>body_weight</code> only and does not process unrelated health measurements. The service-role key is for local/server automation only and must never be exposed in client code.</p>
+npm run medm:sync:import -- --lifetime</pre>
+  <p>The import maps every MedM weight row into <code>metric_events</code> and upserts on <code>user_id, source, source_record_id</code>. It then derives <code>daily_metrics</code> as a latest-event-per-day summary and upserts on <code>user_id, metric_date, metric_type, source</code>. It imports <code>body_weight</code> only and does not process unrelated health measurements. The service-role key is for local/server automation only and must never be exposed in client code.</p>
 
   <h3>GitHub Actions</h3>
-  <p>The workflow <code>.github/workflows/medm-health-sync.yml</code> supports manual runs and a daily cron. Scheduled runs are dry-run only. Manual runs default to dry-run and can opt into import by setting <code>dry_run=false</code>.</p>
+  <p>The workflow <code>.github/workflows/medm-health-sync.yml</code> supports manual runs and a daily cron. Scheduled runs use full-history mode by default. Manual runs default to dry-run and can opt into import by setting <code>dry_run=false</code>; optionally provide <code>days</code> for testing a smaller backfill window.</p>
   <p>Dry-run requires these repository secrets:</p>
   <ul>
     <li><code>MEDM_EMAIL</code></li>
@@ -137,12 +140,15 @@ npm run medm:sync:import -- --days 30</pre>
   <p>The workflow installs Playwright Chromium, runs synthetic parser/helper tests, and then runs the portal sync. It does not upload downloaded reports as artifacts and logs only report status, CSV filenames, parsed row counts, and date ranges.</p>
 
   <h3>Storage</h3>
-  <p>The new <code>daily_metrics</code> table is generic and private. RLS allows authenticated users to read, insert, and update only rows where <code>auth.uid() = user_id</code>. The automation upsert uses server-side secrets and the target user id; no service-role secret is used in browser/client code.</p>
+  <p>The new <code>metric_events</code> table is the source of truth and preserves every weigh-in. The <code>daily_metrics</code> table is a derived summary table used for daily views. For body weight, the current summary rule chooses the latest event per <code>metric_date</code>. Both tables are generic and private. RLS allows authenticated users to read, insert, and update only rows where <code>auth.uid() = user_id</code>. The automation upsert uses server-side secrets and the target user id; no service-role secret is used in browser/client code.</p>
+
+  <h3>Sync Strategy</h3>
+  <p>Scheduled sync intentionally reimports full MedM weight history on every run. Body-weight data volume is tiny, and idempotent upserts into <code>metric_events</code> are simpler and safer than maintaining last-sync state or overlap windows.</p>
 
   <h3>Rollback and Safety</h3>
   <ul>
     <li>To stop imports, leave the workflow in dry-run mode or remove the Supabase import secrets/variable.</li>
-    <li>To remove imported MedM rows after testing, delete rows where <code>source = 'medm_health'</code> for the target user.</li>
+    <li>To remove imported MedM rows after testing, delete rows where <code>source = 'medm_health'</code> for the target user from both <code>metric_events</code> and <code>daily_metrics</code>.</li>
     <li>Do not commit files from <code>local-data/</code>. Real MedM ZIP/CSV downloads are local-only debug artifacts.</li>
   </ul>
 

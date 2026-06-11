@@ -62,6 +62,21 @@ assert.equal(portal.rows[0].unit, "lb");
 assert.equal(portal.rows[2].unit, "kg");
 assert.match(portal.rows[0].source_detail, /MedM Health Portal/);
 
+const realPortalHeaders = parseMedmWeightCsv(
+  readFixture("synthetic-medm-portal-real-headers.csv"),
+);
+assert.equal(realPortalHeaders.warnings.length, 0);
+assert.equal(realPortalHeaders.rows.length, 3);
+realPortalHeaders.rows.forEach(assertMetricShape);
+assert.ok(realPortalHeaders.header_names.includes("Date & Time (Local Time)"));
+assert.ok(realPortalHeaders.header_names.includes("Measurement units"));
+assert.equal(realPortalHeaders.rows[0].source_record_id, "synthetic-medm-real-001");
+assert.equal(realPortalHeaders.rows[0].date, "2026-06-11");
+assert.equal(realPortalHeaders.rows[0].unit, "lb");
+assert.equal(realPortalHeaders.rows[1].unit, "lb");
+assert.equal(realPortalHeaders.rows[2].unit, "kg");
+assert.match(realPortalHeaders.rows[0].source_detail, /Synthetic Portal Scale/);
+
 const malformed = parseMedmWeightCsv(
   readFixture("synthetic-medm-weight-malformed.csv"),
 );
@@ -82,5 +97,12 @@ assert.equal(duplicates.rows[0].raw_hash, duplicates.rows[1].raw_hash);
 
 assert.equal(normalizedUnit("", "180 pounds", "Weight"), "lb");
 assert.equal(normalizedUnit("", "81 kilograms", "Weight"), "kg");
+assert.equal(normalizedUnit("lb", "", "Weight"), "lb");
+assert.equal(normalizedUnit("lbs", "", "Weight"), "lb");
+assert.equal(normalizedUnit("pound", "", "Weight"), "lb");
+assert.equal(normalizedUnit("pounds", "", "Weight"), "lb");
+assert.equal(normalizedUnit("kg", "", "Weight"), "kg");
+assert.equal(normalizedUnit("kilogram", "", "Weight"), "kg");
+assert.equal(normalizedUnit("kilograms", "", "Weight"), "kg");
 
 console.log("MedM body-weight parser tests passed.");

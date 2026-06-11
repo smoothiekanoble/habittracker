@@ -17,18 +17,17 @@ const DEBUG_ROOT = join(IMPORT_ROOT, "debug");
 export const LOGIN_PATHS = [
   "/en/user/login",
   "/en",
-  "/user/login",
   "/en/users/sign_in",
 ];
 
 export const EMAIL_LOGIN_SELECTORS = [
   'input[type="email"]',
-  'input[name="email"]',
   'input[name="user[email]"]',
+  'input[name="email"]',
+  'input[name="login"]',
+  'input[name="username"]',
   'input[autocomplete="email"]',
   'input[autocomplete="username"]',
-  'input[name*="login" i]',
-  'input[name*="username" i]',
   'input[id*="email" i]',
   'input[id*="login" i]',
   'input[id*="username" i]',
@@ -37,11 +36,10 @@ export const EMAIL_LOGIN_SELECTORS = [
 
 export const PASSWORD_SELECTORS = [
   'input[type="password"]',
-  'input[name="password"]',
   'input[name="user[password]"]',
-  'input[name*="password" i]',
-  'input[id*="password" i]',
+  'input[name="password"]',
   'input[autocomplete="current-password"]',
+  'input[id*="password" i]',
 ];
 
 export const SUBMIT_SELECTORS = [
@@ -308,6 +306,7 @@ async function findLoginFields(page, baseUrl) {
   for (const path of LOGIN_PATHS) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => {});
+    await logPageLocation(page, `Checking MedM login page ${path}`);
 
     const email = await locateFirst(page, EMAIL_LOGIN_SELECTORS);
     const password = await locateFirst(page, PASSWORD_SELECTORS);
@@ -319,6 +318,7 @@ async function findLoginFields(page, baseUrl) {
 
   await page.goto(`${baseUrl}${LOGIN_PATHS[0]}`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle").catch(() => {});
+  await logPageLocation(page, "Saving MedM login debug artifacts from primary login page");
 
   return null;
 }
@@ -348,9 +348,12 @@ async function clickFirst(page, selectors) {
   throw new Error(`Could not find submit control. Tried: ${selectors.join(", ")}`);
 }
 
+async function logPageLocation(page, label) {
+  console.log(`${label}: url=${page.url()} title=${await page.title()}`);
+}
+
 async function saveLoginDebugArtifact(page, reason) {
   mkdirSync(DEBUG_ROOT, { recursive: true });
-  const artifactBase = join(DEBUG_ROOT, `${safeTimestamp()}-${reason}`);
   const html = sanitizeHtmlForDebug(await page.content());
   const metadata = [
     `url: ${page.url()}`,
@@ -358,11 +361,11 @@ async function saveLoginDebugArtifact(page, reason) {
     `reason: ${reason}`,
   ].join("\n");
 
-  writeFileSync(`${artifactBase}.txt`, `${metadata}\n`);
-  writeFileSync(`${artifactBase}.html`, html);
-  await page.screenshot({ path: `${artifactBase}.png`, fullPage: true });
+  writeFileSync(join(DEBUG_ROOT, "login-page.txt"), `${metadata}\n`);
+  writeFileSync(join(DEBUG_ROOT, "login-page.html"), html);
+  await page.screenshot({ path: join(DEBUG_ROOT, "login-page.png"), fullPage: true });
 
-  return artifactBase;
+  return DEBUG_ROOT;
 }
 
 export function sanitizeHtmlForDebug(html) {

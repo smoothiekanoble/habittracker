@@ -62,3 +62,15 @@ jobs:
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
           test -n "$SUPABASE_METRICS_USER_ID"
           npm run medm:sync:import -- --days "${{ github.event.inputs.days || '30' }}"
+
+      - name: Upload MedM login debug artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: medm-login-debug
+          path: |
+            local-data/imports/medm-health/debug/login-page.html
+            local-data/imports/medm-health/debug/login-page.png
+            local-data/imports/medm-health/debug/login-page.txt
+          if-no-files-found: ignore
+          retention-days: 3

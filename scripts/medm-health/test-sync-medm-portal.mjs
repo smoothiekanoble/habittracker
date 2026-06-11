@@ -26,13 +26,19 @@ assert.equal(parseArgs(["--dry-run", "false"]).dryRun, false);
 assert.throws(() => parseArgs(["--days", "0"]), /--days/);
 
 assert.equal(LOGIN_PATHS[0], "/en/user/login");
+assert.deepEqual(LOGIN_PATHS, [
+  "/en/user/login",
+  "/en",
+  "/en/users/sign_in",
+]);
 assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[type="text"]'));
-assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name*="login" i]'));
-assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name*="username" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name="login"]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[name="username"]'));
 assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[id*="login" i]'));
 assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[id*="username" i]'));
+assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[autocomplete="email"]'));
 assert.ok(EMAIL_LOGIN_SELECTORS.includes('input[autocomplete="username"]'));
-assert.ok(PASSWORD_SELECTORS.includes('input[name*="password" i]'));
+assert.ok(PASSWORD_SELECTORS.includes('input[name="password"]'));
 assert.ok(PASSWORD_SELECTORS.includes('input[id*="password" i]'));
 assert.ok(PASSWORD_SELECTORS.includes('input[autocomplete="current-password"]'));
 

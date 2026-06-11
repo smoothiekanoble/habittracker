@@ -43,6 +43,25 @@ assert.deepEqual(
 assert.equal(kilograms.rows[0].value, 81.7);
 assert.ok(kilograms.rows[0].raw_hash);
 
+const portal = parseMedmWeightCsv(
+  readFixture("synthetic-medm-portal-weight-report.csv"),
+);
+assert.deepEqual(portal.header_names, [
+  "Measurement Type",
+  "Measured At",
+  "Result",
+  "Units",
+  "Device Name",
+  "Source",
+]);
+assert.equal(portal.warnings.length, 0);
+assert.equal(portal.rows.length, 3);
+portal.rows.forEach(assertMetricShape);
+assert.equal(portal.rows[0].date, "2026-06-08");
+assert.equal(portal.rows[0].unit, "lb");
+assert.equal(portal.rows[2].unit, "kg");
+assert.match(portal.rows[0].source_detail, /MedM Health Portal/);
+
 const malformed = parseMedmWeightCsv(
   readFixture("synthetic-medm-weight-malformed.csv"),
 );
@@ -51,6 +70,7 @@ assert.equal(malformed.warnings.length, 3);
 assert.match(malformed.warnings[0].reason, /date/);
 assert.match(malformed.warnings[1].reason, /nonnumeric/);
 assert.match(malformed.warnings[2].reason, /unit/);
+assert.equal("row" in malformed.warnings[0], false);
 assertMetricShape(malformed.rows[0]);
 
 const duplicates = parseMedmWeightCsv(`Date,Weight,Unit

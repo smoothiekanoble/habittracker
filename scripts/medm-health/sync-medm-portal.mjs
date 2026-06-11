@@ -620,6 +620,13 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
 
         if (parsed.warnings.length > 0) {
           console.log(`Parser warnings: ${parsed.warnings.length}`);
+          for (const reason of warningReasons(parsed.warnings)) {
+            console.log(`Parser warning reason: ${reason}`);
+          }
+        }
+
+        if (parsed.rows.length === 0) {
+          console.log(`CSV headers: ${parsed.header_names.join(", ")}`);
         }
       }
     } finally {
@@ -652,6 +659,10 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
     console.error(error.message);
     return 1;
   }
+}
+
+function warningReasons(warnings) {
+  return [...new Set(warnings.map((warning) => warning.reason))];
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

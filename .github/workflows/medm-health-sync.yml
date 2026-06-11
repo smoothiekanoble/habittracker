@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       days:
-        description: "Backfill window in local days"
+        description: "Optional backfill window in local days. Leave blank for full history."
         required: false
-        default: "30"
+        default: ""
       dry_run:
         description: "Run without writing to Supabase"
         required: false
@@ -52,7 +52,13 @@ jobs:
 
       - name: Dry-run MedM portal sync
         if: ${{ github.event_name == 'schedule' || github.event.inputs.dry_run != 'false' }}
-        run: npm run medm:sync:dry-run -- --days "${{ github.event.inputs.days || '30' }}"
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.days }}" ]; then
+            npm run medm:sync:dry-run -- --days "${{ github.event.inputs.days }}"
+          else
+            npm run medm:sync:dry-run -- --lifetime
+          fi
 
       - name: Import MedM portal sync
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false' }}
@@ -61,7 +67,11 @@ jobs:
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
           test -n "$SUPABASE_METRICS_USER_ID"
-          npm run medm:sync:import -- --days "${{ github.event.inputs.days || '30' }}"
+          if [ -n "${{ github.event.inputs.days }}" ]; then
+            npm run medm:sync:import -- --days "${{ github.event.inputs.days }}"
+          else
+            npm run medm:sync:import -- --lifetime
+          fi
 
       - name: Upload MedM login debug artifacts
         if: ${{ failure() }}

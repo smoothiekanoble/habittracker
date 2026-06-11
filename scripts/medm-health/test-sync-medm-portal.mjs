@@ -7,10 +7,13 @@ import {
   PASSWORD_SELECTORS,
   dailyMetricPayload,
   dailyMetricPayloads,
-  dedupeDailyMetricRows,
+  deriveDailyMetricRows,
+  dedupeMetricEventRows,
   extractCsvFilesFromZip,
   findReportLinks,
   localBackfillWindow,
+  metricEventPayload,
+  metricEventPayloads,
   parseArgs,
   sanitizeHtmlForDebug,
   summarizeParsedFiles,
@@ -21,9 +24,13 @@ const args = parseArgs(["--days", "14", "--headless", "false"]);
 assert.equal(args.days, 14);
 assert.equal(args.headless, false);
 assert.equal(args.dryRun, true);
+assert.equal(args.lifetime, false);
+assert.equal(parseArgs([]).lifetime, true);
 assert.equal(parseArgs(["--import"]).dryRun, false);
 assert.equal(parseArgs(["--dry-run", "false"]).dryRun, false);
+assert.equal(parseArgs(["--from-date", "2026-01-01"]).fromDate, "2026-01-01");
 assert.throws(() => parseArgs(["--days", "0"]), /--days/);
+assert.throws(() => parseArgs(["--from-date", "01/01/2026"]), /--from-date/);
 
 assert.equal(LOGIN_PATHS[0], "/en/user/login");
 assert.deepEqual(LOGIN_PATHS, [
@@ -64,7 +71,8 @@ assert.deepEqual(metricPayload, {
   source: "medm_health",
   source_detail: {
     detail: "MedM Health CSV; time 07:01",
-    raw_hash: "abc123",
+    source_record_id: "abc123",
+    occurred_at: "2026-06-10T07:01:00.000Z",
   },
 });
 assert.deepEqual(dailyMetricPayloads([sampleMetricRow()], "user-1"), [
@@ -77,26 +85,48 @@ assert.deepEqual(dailyMetricPayloads([sampleMetricRow()], "user-1"), [
     source: "medm_health",
     source_detail: {
       detail: "MedM Health CSV; time 07:01",
-      raw_hash: "abc123",
+      source_record_id: "abc123",
+      occurred_at: "2026-06-10T07:01:00.000Z",
     },
   },
 ]);
 const duplicateDailyRows = [
-  { ...sampleMetricRow(), source_detail: "MedM Health CSV; time 07:01", raw_hash: "a" },
-  { ...sampleMetricRow(), source_detail: "MedM Health CSV; time 07:05", raw_hash: "b" },
+  { ...sampleMetricRow(), source_record_id: "event-a", occurred_at: "2026-06-10T07:01:00.000Z" },
+  { ...sampleMetricRow(), source_record_id: "event-b", occurred_at: "2026-06-10T20:05:00.000Z" },
 ];
-assert.equal(dedupeDailyMetricRows(duplicateDailyRows).length, 1);
+assert.equal(dedupeMetricEventRows(duplicateDailyRows).length, 2);
 assert.equal(dailyMetricPayloads(duplicateDailyRows, "user-1").length, 1);
+assert.equal(deriveDailyMetricRows(duplicateDailyRows)[0].source_record_id, "event-b");
+assert.equal(metricEventPayloads(duplicateDailyRows, "user-1").length, 2);
+assert.deepEqual(metricEventPayload(sampleMetricRow(), "user-1"), {
+  user_id: "user-1",
+  occurred_at: "2026-06-10T07:01:00.000Z",
+  metric_date: "2026-06-10",
+  metric_type: "body_weight",
+  value: 180.1,
+  unit: "lb",
+  source: "medm_health",
+  source_record_id: "abc123",
+  source_detail: "MedM Health CSV; time 07:01",
+  raw_metadata: {},
+});
+assert.equal(
+  dedupeMetricEventRows([sampleMetricRow(), sampleMetricRow()]).length,
+  1,
+);
 
 function sampleMetricRow() {
   return {
     date: "2026-06-10",
+    metric_date: "2026-06-10",
+    occurred_at: "2026-06-10T07:01:00.000Z",
     metric_type: "body_weight",
     value: 180.1,
     unit: "lb",
     source: "medm_health",
     source_detail: "MedM Health CSV; time 07:01",
-    raw_hash: "abc123",
+    source_record_id: "abc123",
+    raw_metadata: {},
   };
 }
 
@@ -143,9 +173,12 @@ assert.deepEqual(
   ]),
   {
     rowCount: 2,
+    eventRowCount: 2,
     dateRange: "2026-06-10 to 2026-06-10",
     warningCount: 1,
     fileCount: 1,
+    uniqueEventCount: 2,
+    dailyMetricCount: 1,
     uniqueDailyMetricCount: 1,
   },
 );

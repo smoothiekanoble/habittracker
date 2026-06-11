@@ -291,7 +291,55 @@ export function metricDate(dateValue, timeValue) {
     return null;
   }
 
-  return parsed.toISOString().slice(0, 10);
+  return [
+    String(parsed.getFullYear()).padStart(4, "0"),
+    String(parsed.getMonth() + 1).padStart(2, "0"),
+    String(parsed.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+export function metricTimestamp(dateValue, timeValue) {
+  if (!dateValue) {
+    return null;
+  }
+
+  const dateText = String(dateValue).trim();
+  const combinedText = timeValue ? `${dateText} ${String(timeValue).trim()}` : dateText;
+  const isoMatch = combinedText.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+
+  if (isoMatch) {
+    return timestampFromParts(isoMatch[1], isoMatch[2], isoMatch[3], combinedText);
+  }
+
+  const slashMatch = combinedText.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+
+  if (slashMatch) {
+    return timestampFromParts(
+      expandYear(slashMatch[3]),
+      slashMatch[1],
+      slashMatch[2],
+      combinedText,
+    );
+  }
+
+  const dotMatch = combinedText.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+
+  if (dotMatch) {
+    return timestampFromParts(
+      expandYear(dotMatch[3]),
+      dotMatch[2],
+      dotMatch[1],
+      combinedText,
+    );
+  }
+
+  const parsed = new Date(combinedText);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
 }
 
 export function expandYear(year) {
@@ -310,6 +358,27 @@ export function formatDate(year, month, day) {
   }
 
   return [year.padStart(4, "0"), month.padStart(2, "0"), day.padStart(2, "0")].join("-");
+}
+
+function timestampFromParts(year, month, day, text) {
+  const date = formatDate(year, month, day);
+
+  if (!date) {
+    return null;
+  }
+
+  const timeMatch = String(text).match(/\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/);
+
+  if (!timeMatch) {
+    return new Date(`${date}T00:00:00`).toISOString();
+  }
+
+  const hours = timeMatch[1].padStart(2, "0");
+  const minutes = timeMatch[2];
+  const seconds = timeMatch[3] ?? "00";
+  const parsed = new Date(`${date}T${hours}:${minutes}:${seconds}`);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 export function normalizedUnit(unitValue, valueValue, valueHeader) {
@@ -360,6 +429,18 @@ export function rowHash(headers, row) {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
+export function fallbackSourceRecordId(row) {
+  const canonical = [
+    row.source,
+    row.metric_type,
+    row.occurred_at,
+    row.value,
+    row.unit,
+  ].join("|");
+
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
 function inferredSectionLabel(rows, headerRowIndex) {
   for (let index = headerRowIndex - 1; index >= 0; index -= 1) {
     const row = rows[index].filter(Boolean);
@@ -400,6 +481,7 @@ export function parseMedmWeightCsv(text) {
     const rowNumber = headerRowIndex + rowIndex + 2;
     const dateValue = firstValue(row, index, DATE_COLUMNS);
     const timeValue = firstValue(row, index, TIME_COLUMNS);
+    const occurredAt = metricTimestamp(dateValue, timeValue);
     const date = metricDate(dateValue, timeValue);
     const rawValue = firstValue(row, index, VALUE_COLUMNS);
     const value = numericValue(rawValue, delimiter);
@@ -437,14 +519,22 @@ export function parseMedmWeightCsv(text) {
       return;
     }
 
-    normalized.push({
+    const normalizedRow = {
       date,
+      metric_date: date,
+      occurred_at: occurredAt,
       metric_type: "body_weight",
       value,
       unit,
       source: "medm_health",
       source_detail: sourceDetail(row, index, timeValue),
-      ...(sourceRecordId ? { source_record_id: sourceRecordId } : { raw_hash: rawHash }),
+      raw_metadata: { raw_hash: rawHash },
+    };
+
+    normalized.push({
+      ...normalizedRow,
+      source_record_id: sourceRecordId || fallbackSourceRecordId(normalizedRow),
+      ...(sourceRecordId ? {} : { raw_hash: rawHash }),
     });
   });
 

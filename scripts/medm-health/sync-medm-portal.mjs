@@ -55,7 +55,7 @@ export const SUBMIT_SELECTORS = [
 
 function usage() {
   return [
-    "Usage: node scripts/medm-health/sync-medm-portal.mjs [--days 30] [--headless true|false] [--import]",
+    "Usage: node scripts/medm-health/sync-medm-portal.mjs [--lifetime] [--days 30] [--from-date YYYY-MM-DD] [--headless true|false] [--import]",
     "",
     "Required env vars: MEDM_EMAIL, MEDM_PASSWORD, MEDM_RECORD_ID",
     "Import env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_METRICS_USER_ID",
@@ -66,8 +66,10 @@ function usage() {
 export function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     days: 30,
+    fromDate: null,
     headless: true,
     dryRun: true,
+    lifetime: true,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -76,7 +78,15 @@ export function parseArgs(argv = process.argv.slice(2)) {
 
     if (arg === "--days") {
       options.days = Number(value);
+      options.lifetime = false;
       index += 1;
+    } else if (arg === "--from-date") {
+      options.fromDate = value;
+      options.lifetime = false;
+      index += 1;
+    } else if (arg === "--lifetime") {
+      options.lifetime = true;
+      options.fromDate = null;
     } else if (arg === "--headless") {
       options.headless = value !== "false";
       index += 1;
@@ -96,19 +106,64 @@ export function parseArgs(argv = process.argv.slice(2)) {
     throw new Error("--days must be an integer from 1 to 3660.");
   }
 
+  if (options.fromDate && !/^\d{4}-\d{2}-\d{2}$/.test(options.fromDate)) {
+    throw new Error("--from-date must use YYYY-MM-DD.");
+  }
+
   return options;
+}
+
+export function metricEventPayload(row, userId) {
+  const sourceRecordId = row.source_record_id || fallbackEventSourceRecordId(row);
+
+  return {
+    user_id: userId,
+    occurred_at: row.occurred_at,
+    metric_date: row.metric_date ?? row.date,
+    metric_type: row.metric_type,
+    value: row.value,
+    unit: row.unit,
+    source: row.source,
+    source_record_id: sourceRecordId,
+    source_detail: row.source_detail ?? null,
+    raw_metadata: row.raw_metadata ?? {},
+  };
+}
+
+export function metricEventPayloads(rows, userId) {
+  return dedupeMetricEventRows(rows).map((row) => metricEventPayload(row, userId));
+}
+
+export function dedupeMetricEventRows(rows) {
+  const bySourceRecordId = new Map();
+
+  for (const row of rows) {
+    bySourceRecordId.set(row.source_record_id || fallbackEventSourceRecordId(row), row);
+  }
+
+  return [...bySourceRecordId.values()];
+}
+
+function fallbackEventSourceRecordId(row) {
+  return [
+    row.source,
+    row.metric_type,
+    row.occurred_at,
+    row.value,
+    row.unit,
+  ].join("|");
 }
 
 export function dailyMetricPayload(row, userId) {
   const sourceDetail = {
     detail: row.source_detail ?? null,
     source_record_id: row.source_record_id ?? null,
-    raw_hash: row.raw_hash ?? null,
+    occurred_at: row.occurred_at ?? null,
   };
 
   return {
     user_id: userId,
-    metric_date: row.date,
+    metric_date: row.metric_date ?? row.date,
     metric_type: row.metric_type,
     value: row.value,
     unit: row.unit,
@@ -120,10 +175,10 @@ export function dailyMetricPayload(row, userId) {
 }
 
 export function dailyMetricPayloads(rows, userId) {
-  return dedupeDailyMetricRows(rows).map((row) => dailyMetricPayload(row, userId));
+  return deriveDailyMetricRows(rows).map((row) => dailyMetricPayload(row, userId));
 }
 
-export function dedupeDailyMetricRows(rows) {
+export function deriveDailyMetricRows(rows) {
   const sortedRows = [...rows].sort((left, right) =>
     stableMetricRowSortKey(left).localeCompare(stableMetricRowSortKey(right)),
   );
@@ -137,14 +192,15 @@ export function dedupeDailyMetricRows(rows) {
 }
 
 function metricRowKey(row) {
-  return [row.date, row.metric_type, row.source].join("|");
+  return [row.metric_date ?? row.date, row.metric_type, row.source].join("|");
 }
 
 function stableMetricRowSortKey(row) {
   return [
-    row.date,
+    row.metric_date ?? row.date,
     row.metric_type,
     row.source,
+    row.occurred_at ?? "",
     row.source_detail ?? "",
     row.source_record_id ?? "",
     row.raw_hash ?? "",
@@ -177,6 +233,39 @@ export function localBackfillWindow(days, now = new Date()) {
     localStartDate: dateOnly(startLocal),
     localEndDate: dateOnly(endLocal),
   };
+}
+
+export function localFromDateWindow(fromDate, now = new Date()) {
+  const [year, month, day] = fromDate.split("-").map(Number);
+  const startLocal = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const endLocal = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+
+  return {
+    fromDate: startLocal.toISOString(),
+    toDate: endLocal.toISOString(),
+    localStartDate: dateOnly(startLocal),
+    localEndDate: dateOnly(endLocal),
+  };
+}
+
+export function syncWindow(options, now = new Date()) {
+  if (options.lifetime) {
+    return localFromDateWindow("1970-01-01", now);
+  }
+
+  if (options.fromDate) {
+    return localFromDateWindow(options.fromDate, now);
+  }
+
+  return localBackfillWindow(options.days, now);
 }
 
 export function findReportLinks(html, recordId) {
@@ -269,11 +358,14 @@ export function summarizeParsedFiles(parsedFiles) {
   const summary = summarizeRows(rows);
 
   return {
+    eventRowCount: summary.rowCount,
     rowCount: summary.rowCount,
     dateRange: summary.dateRange,
     warningCount: warnings,
     fileCount: parsedFiles.length,
-    uniqueDailyMetricCount: dedupeDailyMetricRows(rows).length,
+    uniqueEventCount: dedupeMetricEventRows(rows).length,
+    dailyMetricCount: deriveDailyMetricRows(rows).length,
+    uniqueDailyMetricCount: deriveDailyMetricRows(rows).length,
   };
 }
 
@@ -510,6 +602,44 @@ async function upsertDailyMetrics(rows, env) {
   return { upsertedRows: payloads.length };
 }
 
+async function upsertMetricEvents(rows, env) {
+  const missing = [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_METRICS_USER_ID",
+  ].filter((name) => !env[name]);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing import env vars: ${missing.join(", ")}`);
+  }
+
+  if (rows.length === 0) {
+    return { upsertedRows: 0 };
+  }
+
+  const payloads = metricEventPayloads(rows, env.SUPABASE_METRICS_USER_ID);
+  const url = new URL("/rest/v1/metric_events", env.SUPABASE_URL);
+  url.searchParams.set("on_conflict", "user_id,source,source_record_id");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(payloads),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`metric_events upsert failed with HTTP ${response.status}: ${errorText}`);
+  }
+
+  return { upsertedRows: payloads.length };
+}
+
 function ensureImportDir() {
   mkdirSync(IMPORT_ROOT, { recursive: true });
   return IMPORT_ROOT;
@@ -559,7 +689,7 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
   const baseUrl = env.MEDM_BASE_URL ?? PORTAL_ORIGIN;
   const timeoutSeconds = Number(env.MEDM_SYNC_TIMEOUT_SECONDS ?? 120);
   const pollSeconds = Number(env.MEDM_SYNC_POLL_SECONDS ?? 10);
-  const window = localBackfillWindow(options.days);
+  const window = syncWindow(options);
   const sessionId = safeTimestamp();
   const importDir = ensureImportDir();
   const parsedFiles = [];
@@ -615,7 +745,7 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
         console.log(`Parsed rows: ${summary.rowCount}`);
         console.log(`Parsed date range: ${summary.dateRange}`);
         console.log(
-          "Normalized fields: date, metric_type, value, unit, source, source_detail.",
+          "Normalized fields: occurred_at, metric_date, metric_type, value, unit, source, source_record_id, source_detail.",
         );
 
         if (parsed.warnings.length > 0) {
@@ -635,23 +765,26 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
 
     const totalSummary = summarizeParsedFiles(parsedFiles);
 
-    if (totalSummary.rowCount === 0) {
+    if (totalSummary.eventRowCount === 0) {
       throw new Error("No valid MedM body-weight rows were parsed from the downloaded report.");
     }
 
     console.log(
-      `MedM weight sync summary: ${totalSummary.rowCount} rows across ${totalSummary.fileCount} CSV file(s), ${totalSummary.dateRange}.`,
+      `MedM weight sync summary: ${totalSummary.eventRowCount} event rows across ${totalSummary.fileCount} CSV file(s), ${totalSummary.dateRange}.`,
     );
+    console.log(`Unique event rows ready for upsert: ${totalSummary.uniqueEventCount}`);
+    console.log(`Daily summary rows ready for upsert: ${totalSummary.dailyMetricCount}`);
 
     if (options.dryRun) {
-      console.log(`Unique daily metric rows ready for upsert: ${totalSummary.uniqueDailyMetricCount}`);
-      console.log("Dry run only. Pass --import to upsert into daily_metrics.");
+      console.log("Dry run only. Pass --import to upsert into metric_events and daily_metrics.");
     } else if (!existsSync(join("supabase", "migrations"))) {
       throw new Error("Cannot import because supabase/migrations is missing.");
     } else {
-      const rows = dedupeDailyMetricRows(parsedFiles.flatMap((file) => file.rows));
-      const result = await upsertDailyMetrics(rows, env);
-      console.log(`Imported rows into daily_metrics: ${result.upsertedRows}`);
+      const rows = parsedFiles.flatMap((file) => file.rows);
+      const eventResult = await upsertMetricEvents(rows, env);
+      const dailyResult = await upsertDailyMetrics(rows, env);
+      console.log(`Imported event rows into metric_events: ${eventResult.upsertedRows}`);
+      console.log(`Imported daily rows into daily_metrics: ${dailyResult.upsertedRows}`);
     }
 
     return 0;

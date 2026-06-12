@@ -1,4 +1,4 @@
-name: MedM Health sync dry run
+name: MedM Health sync
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ on:
     - cron: "17 10 * * *"
 
 jobs:
-  dry-run:
+  sync:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -51,7 +51,7 @@ jobs:
         run: npm run test:medm
 
       - name: Dry-run MedM portal sync
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.dry_run != 'false' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'false' }}
         shell: bash
         run: |
           if [ -n "${{ github.event.inputs.days }}" ]; then
@@ -61,13 +61,15 @@ jobs:
           fi
 
       - name: Import MedM portal sync
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false' }}
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false') }}
         shell: bash
         run: |
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
           test -n "$SUPABASE_METRICS_USER_ID"
-          if [ -n "${{ github.event.inputs.days }}" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            npm run medm:sync:import -- --days 30
+          elif [ -n "${{ github.event.inputs.days }}" ]; then
             npm run medm:sync:import -- --days "${{ github.event.inputs.days }}"
           else
             npm run medm:sync:import -- --lifetime

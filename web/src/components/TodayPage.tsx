@@ -5,7 +5,6 @@ import { flushSync } from "react-dom";
 import Link from "next/link";
 import { TodayHabitRow } from "@/components/TodayHabitRow";
 import { TodayMonthBucketCalendar } from "@/components/TodayMonthBucketCalendar";
-import { CodexUsageWidget } from "@/components/CodexUsageWidget";
 import { toLocalYMD } from "@/lib/calendar";
 import { buildDailyCompletionMap, habitAppliesOnDate } from "@/lib/today-month-stats";
 import { createClient, type Habit, type HabitLog } from "@/lib/supabase";
@@ -276,7 +275,6 @@ export function TodayPage() {
                 </Link>
               </header>
             </div>
-            <CodexUsageWidget />
             {habits.length === 0 ? (
               <div className="text-center py-12 text-zinc-500">
                 <p>No habits yet.</p>

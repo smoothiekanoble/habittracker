@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Garmin Sleep Sync Research</title>
+  <style>
+    :root { color-scheme: light; --ink: #17211b; --muted: #5d6a62; --line: #dce5de; --panel: #f7faf7; --accent: #28795f; --warn: #9b5c12; --code: #111c17; }
+    body { margin: 0; font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: #fff; }
+    main { max-width: 980px; margin: 0 auto; padding: 44px 22px 72px; }
+    h1 { margin: 0 0 12px; font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.05; letter-spacing: 0; }
+    h2 { margin: 34px 0 10px; font-size: 1.35rem; }
+    h3 { margin: 22px 0 8px; font-size: 1.03rem; }
+    p { margin: 0 0 14px; }
+    a { color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.95rem; }
+    th, td { text-align: left; vertical-align: top; padding: 11px 10px; border-bottom: 1px solid var(--line); }
+    th { background: #eef5f0; font-weight: 700; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+    pre { overflow: auto; padding: 14px; background: var(--code); color: #edf7f0; border-radius: 8px; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 6px 0; }
+    .lede { color: var(--muted); font-size: 1.08rem; max-width: 800px; }
+    .meta { color: var(--muted); font-size: 0.92rem; margin-bottom: 28px; }
+    .callout { margin: 22px 0; padding: 18px; border: 1px solid var(--line); border-left: 5px solid var(--accent); background: var(--panel); border-radius: 8px; }
+    .warning { border-left-color: var(--warn); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Garmin Sleep Sync Research</h1>
+  <p class="lede">Local-first spike for importing Garmin Connect sleep into HabitTracker <code>daily_metrics</code>. Authentication is treated as experimental; credentials, token cache, and raw JSON must stay outside git.</p>
+  <p class="meta">Prepared June 11, 2026. Production upsert requires explicit <code>--upsert</code>.</p>
+
+  <section class="callout">
+    <h2>Recommendation</h2>
+    <p>Use <code>python-garminconnect</code> for authentication and token refresh. Fetch sleep with <code>get_sleep_data(date)</code> first, then fall back to the richer known endpoint <code>/gc-api/sleep-service/sleep/dailySleepData?date=YYYY-MM-DD&amp;nonSleepBufferMinutes=60</code> through the authenticated client if needed.</p>
+    <p>Run locally with <code>GARMINTOKENS=local-data/garmin/tokens</code>. GitHub Actions can run dry-run experiments, but token persistence there is fragile unless tokens are stored in a secret or cache. Local Windows token cache is preferred.</p>
+  </section>
+
+  <h2>Library Findings</h2>
+  <ul>
+    <li>The latest <code>python-garminconnect</code> README says authentication uses Garmin's mobile SSO flow and stores tokens by default under <code>~/.garminconnect/garmin_tokens.json</code>.</li>
+    <li><code>login(tokenstore)</code> also honors <code>GARMINTOKENS</code>. When it is a path, the library loads cached tokens from that path, refreshes expiring DI tokens, and dumps refreshed tokens back to the path.</li>
+    <li>The current source defines <code>garmin_connect_daily_sleep_url = "/wellness-service/wellness/dailySleepData"</code>. <code>get_sleep_data(cdate)</code> calls that endpoint with <code>date</code> and <code>nonSleepBufferMinutes=60</code>.</li>
+    <li>The known richer endpoint is under <code>/gc-api/sleep-service/sleep/dailySleepData</code>. The spike script attempts the library method first and falls back to that direct endpoint through <code>client.connectapi(...)</code>.</li>
+  </ul>
+
+  <h2>Secret and Raw Data Rules</h2>
+  <ul>
+    <li>Use <code>GARMIN_EMAIL</code> and <code>GARMIN_PASSWORD</code> from environment variables or an untracked local env file.</li>
+    <li>Use <code>GARMINTOKENS=local-data/garmin/tokens</code>.</li>
+    <li>Save raw Garmin JSON only with <code>--save-raw</code>, under <code>local-data/garmin/raw-sleep/YYYY-MM-DD.json</code>.</li>
+    <li><code>.gitignore</code> already ignores <code>local-data/</code>, <code>.env.local</code>, and <code>.env*.local</code>.</li>
+  </ul>
+
+  <h2>Schema</h2>
+  <p>Garmin uses the existing canonical <code>daily_metrics</code> table established by the MedM integration. The unique daily identity is:</p>
+  <pre><code>UNIQUE (user_id, metric_date, metric_type, source)</code></pre>
+  <p>Garmin sleep rows use <code>source = "garmin"</code>, with provider and endpoint metadata inside the JSON <code>source_detail</code> field.</p>
+
+  <h2>Normalized Metrics</h2>
+  <table>
+    <thead><tr><th>Metric type</th><th>Unit</th><th>Source field examples</th></tr></thead>
+    <tbody>
+      <tr><td><code>sleep_minutes</code></td><td><code>minutes</code></td><td><code>sleepTimeSeconds</code>, <code>sleepTime</code></td></tr>
+      <tr><td><code>deep_sleep_minutes</code></td><td><code>minutes</code></td><td><code>deepSleepSeconds</code>, <code>deepSleepTime</code></td></tr>
+      <tr><td><code>light_sleep_minutes</code></td><td><code>minutes</code></td><td><code>lightSleepSeconds</code>, <code>lightSleepTime</code></td></tr>
+      <tr><td><code>rem_sleep_minutes</code></td><td><code>minutes</code></td><td><code>remSleepSeconds</code>, <code>remSleepTime</code></td></tr>
+      <tr><td><code>awake_minutes</code></td><td><code>minutes</code></td><td><code>awakeSleepSeconds</code>, <code>awakeTime</code></td></tr>
+      <tr><td><code>sleep_score</code></td><td><code>score</code></td><td><code>sleepScore</code>, <code>sleepScoresOverall</code></td></tr>
+      <tr><td><code>avg_sleep_stress</code></td><td><code>score</code></td><td><code>averageStressDuringSleep</code>, <code>avgSleepStress</code></td></tr>
+      <tr><td><code>avg_sleep_hr</code></td><td><code>bpm</code></td><td><code>averageHeartRate</code>, <code>avgSleepHr</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Local Test Steps</h2>
+  <ol>
+    <li>Install dependencies: <code>pip install garminconnect curl_cffi</code>.</li>
+    <li>Create an untracked <code>.env.local</code> or set environment variables for <code>GARMIN_EMAIL</code>, <code>GARMIN_PASSWORD</code>, and <code>HABITTRACKER_USER_ID</code>.</li>
+    <li>Run a dry-run: <code>python scripts/garmin/sync_garmin_sleep.py --date 2026-06-10 --dry-run</code>.</li>
+    <li>Optionally save raw JSON locally: <code>python scripts/garmin/sync_garmin_sleep.py --date 2026-06-10 --dry-run --save-raw</code>.</li>
+    <li>Only after reviewing output and confirming the existing metrics migrations are applied, run with <code>--upsert</code>.</li>
+  </ol>
+
+  <h2>GitHub Actions</h2>
+  <p>The workflow is manual <code>workflow_dispatch</code> only. A once-daily schedule is present but commented out. It uses these secrets: <code>GARMIN_EMAIL</code>, <code>GARMIN_PASSWORD</code>, <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, and <code>HABITTRACKER_USER_ID</code>. It dry-runs by default unless the <code>upsert</code> input is set to <code>true</code>.</p>
+  <section class="callout warning">
+    <h2>Actions Auth Risk</h2>
+    <p>Garmin auth may require MFA, rate-limit new environments, or reject repeated fresh logins. Since GitHub-hosted runners are ephemeral, token persistence may not work unless token data is stored as a secret or restored from a cache. Prefer the local Windows token cache for reliable experimentation.</p>
+  </section>
+
+  <h2>Sources</h2>
+  <ul>
+    <li><a href="https://github.com/cyberjunky/python-garminconnect">python-garminconnect README</a></li>
+    <li><a href="https://raw.githubusercontent.com/cyberjunky/python-garminconnect/master/garminconnect/__init__.py">python-garminconnect source</a></li>
+  </ul>
+</main>
+</body>
+</html>

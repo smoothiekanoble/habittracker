@@ -12,6 +12,8 @@ node_modules
 web/node_modules
 web/.next
 web/out
+__pycache__/
+*.py[cod]
 
 # OS / editor
 .DS_Store

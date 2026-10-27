@@ -65,6 +65,23 @@ class GarminNormalizationTests(unittest.TestCase):
             ],
         )
 
+    def test_accepts_nested_sleep_score_and_numeric_strings(self) -> None:
+        payload = {
+            "dailySleepDTO": {
+                "sleepTimeSeconds": "27000",
+                "sleepScores": {"overall": {"value": 76}},
+            }
+        }
+
+        rows = MODULE.normalize_sleep(MODULE.date(2026, 10, 21), payload, "user-1")
+        serialized = MODULE.rows_as_json(rows)
+
+        self.assertEqual(
+            {row["metric_type"] for row in serialized},
+            {"sleep_minutes", "sleep_score"},
+        )
+        self.assertEqual(serialized[0]["value"], 450.0)
+
 
 if __name__ == "__main__":
     unittest.main()

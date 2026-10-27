@@ -118,13 +118,31 @@ def save_raw(day: date, payload: dict[str, Any]) -> None:
     output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def numeric_value(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            parsed = float(value.strip())
+        except ValueError:
+            return None
+        return parsed if parsed == parsed else None
+    if isinstance(value, dict):
+        for nested_key in ("value", "score", "overall"):
+            if nested_key in value:
+                parsed = numeric_value(value[nested_key])
+                if parsed is not None:
+                    return parsed
+    return None
+
+
 def first_number(payload: dict[str, Any], *keys: str) -> float | None:
     for key in keys:
-        value = payload.get(key)
-        if isinstance(value, bool):
-            continue
-        if isinstance(value, int | float):
-            return float(value)
+        value = numeric_value(payload.get(key))
+        if value is not None:
+            return value
     return None
 
 
@@ -163,7 +181,11 @@ def normalize_sleep(day: date, payload: dict[str, Any], user_id: str) -> list[Da
     add("light_sleep_minutes", minutes_from_seconds(first_number(source_payload, "lightSleepSeconds", "lightSleepTime")))
     add("rem_sleep_minutes", minutes_from_seconds(first_number(source_payload, "remSleepSeconds", "remSleepTime")))
     add("awake_minutes", minutes_from_seconds(first_number(source_payload, "awakeSleepSeconds", "awakeTime")))
-    add("sleep_score", first_number(source_payload, "sleepScore", "sleepScoresOverall"), "score")
+    add(
+        "sleep_score",
+        first_number(source_payload, "sleepScore", "sleepScoresOverall", "sleepScores"),
+        "score",
+    )
     add("avg_sleep_stress", first_number(source_payload, "averageStressDuringSleep", "avgSleepStress"), "score")
     add("avg_sleep_hr", first_number(source_payload, "averageHeartRate", "avgSleepHr"), "bpm")
 
@@ -225,7 +247,23 @@ def main() -> int:
         print(f"{day.isoformat()} top-level keys: {sorted(payload.keys())}")
         if args.save_raw:
             save_raw(day, payload)
-        all_rows.extend(normalize_sleep(day, payload, user_id))
+        day_rows = normalize_sleep(day, payload, user_id)
+        if not day_rows:
+            daily = payload.get("dailySleepDTO")
+            known_keys = (
+                "sleepTimeSeconds",
+                "deepSleepSeconds",
+                "lightSleepSeconds",
+                "remSleepSeconds",
+                "awakeSleepSeconds",
+                "sleepScore",
+                "sleepScores",
+                "averageHeartRate",
+            )
+            present_keys = [key for key in known_keys if isinstance(daily, dict) and daily.get(key) is not None]
+            detail = ", ".join(present_keys) if present_keys else "no measured sleep fields"
+            print(f"{day.isoformat()} no normalized sleep metrics ({detail})")
+        all_rows.extend(day_rows)
 
     print(json.dumps(rows_as_json(all_rows), indent=2, sort_keys=True))
     if args.upsert:

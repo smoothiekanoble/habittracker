@@ -28,8 +28,11 @@ on:
         options:
           - "false"
           - "true"
-  # schedule:
-  #   - cron: "17 11 * * *"
+  schedule:
+    # Poll after the usual morning sync, then retry after delayed Garmin uploads.
+    # GitHub supports IANA time zones for scheduled workflows.
+    - cron: "20 10,12 * * *"
+      timezone: "America/Chicago"
 
 jobs:
   sync:
@@ -65,7 +68,7 @@ jobs:
           if [ "${{ inputs.save_raw }}" = "true" ]; then
             args+=(--save-raw)
           fi
-          if [ "${{ inputs.upsert }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.upsert }}" = "true" ]; then
             args+=(--upsert)
           else
             args+=(--dry-run)

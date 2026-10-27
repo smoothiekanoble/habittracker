@@ -44,6 +44,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--days", type=int, default=1, help="Number of days to fetch, ending at --date.")
     parser.add_argument("--dry-run", action="store_true", help="Print normalized rows without upserting.")
     parser.add_argument("--upsert", action="store_true", help="Upsert normalized rows to Supabase.")
+    parser.add_argument(
+        "--adaptive-lookback",
+        action="store_true",
+        help="Fetch the full lookback window only when Garmin sleep data is missing.",
+    )
+    parser.add_argument(
+        "--lookback-days",
+        type=int,
+        default=7,
+        help="Days to inspect when adaptive lookback is enabled.",
+    )
     parser.add_argument("--save-raw", action="store_true", help="Save raw JSON under local-data/garmin/raw-sleep.")
     return parser.parse_args()
 
@@ -227,6 +238,55 @@ def upsert_supabase(rows: list[DailyMetric]) -> None:
             raise RuntimeError(f"Supabase upsert failed with HTTP {response.status}")
 
 
+def existing_sleep_dates(end_date: date, days: int, user_id: str) -> set[str]:
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not supabase_url or not service_role_key:
+        raise SystemExit(
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for --adaptive-lookback."
+        )
+
+    start_date = date_window(end_date, days)[0].isoformat()
+    endpoint = (
+        supabase_url.rstrip("/")
+        + "/rest/v1/daily_metrics?"
+        + parse.urlencode(
+            {
+                "select": "metric_date",
+                "user_id": f"eq.{user_id}",
+                "metric_type": "eq.sleep_minutes",
+                "source": "eq.garmin",
+                "metric_date": f"gte.{start_date}",
+            }
+        )
+    )
+    # Keep the date upper bound explicit while avoiding a second request.
+    endpoint += f"&metric_date=lte.{end_date.isoformat()}"
+    req = request.Request(
+        endpoint,
+        method="GET",
+        headers={"apikey": service_role_key, "Authorization": f"Bearer {service_role_key}"},
+    )
+    with request.urlopen(req, timeout=30) as response:
+        if response.status != 200:
+            raise RuntimeError(f"Supabase metric lookup failed with HTTP {response.status}")
+        payload = json.loads(response.read().decode("utf-8"))
+    return {row["metric_date"] for row in payload if isinstance(row, dict) and row.get("metric_date")}
+
+
+def choose_fetch_days(
+    end_date: date,
+    requested_days: int,
+    lookback_days: int,
+    existing_dates: set[str],
+) -> int:
+    if lookback_days < 1:
+        raise ValueError("--lookback-days must be at least 1")
+    lookback_dates = date_window(end_date, lookback_days)
+    has_missing = any(day.isoformat() not in existing_dates for day in lookback_dates)
+    return max(requested_days, lookback_days) if has_missing else requested_days
+
+
 def main() -> int:
     load_dotenv(Path(".env.local"))
     load_dotenv(Path("scripts/garmin/.env.local"))
@@ -240,9 +300,21 @@ def main() -> int:
     if args.upsert and user_id == DRY_RUN_USER_ID:
         raise SystemExit("HABITTRACKER_USER_ID is required.")
 
+    end_date = parse_day(args.date)
+    if args.adaptive_lookback:
+        if not args.upsert:
+            raise SystemExit("--adaptive-lookback requires --upsert.")
+        existing_dates = existing_sleep_dates(end_date, args.lookback_days, user_id)
+        original_days = args.days
+        args.days = choose_fetch_days(end_date, args.days, args.lookback_days, existing_dates)
+        print(
+            f"Adaptive lookback: {len(existing_dates)}/{args.lookback_days} sleep days present; "
+            f"fetching {args.days} day(s) instead of {original_days}."
+        )
+
     client = ensure_garmin_client()
     all_rows: list[DailyMetric] = []
-    for day in date_window(parse_day(args.date), args.days):
+    for day in date_window(end_date, args.days):
         payload = fetch_sleep_json(client, day)
         print(f"{day.isoformat()} top-level keys: {sorted(payload.keys())}")
         if args.save_raw:

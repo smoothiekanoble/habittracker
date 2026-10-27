@@ -82,6 +82,16 @@ class GarminNormalizationTests(unittest.TestCase):
         )
         self.assertEqual(serialized[0]["value"], 450.0)
 
+    def test_adaptive_lookback_expands_only_when_a_day_is_missing(self) -> None:
+        end_date = MODULE.date(2026, 10, 27)
+        all_dates = {day.isoformat() for day in MODULE.date_window(end_date, 7)}
+
+        self.assertEqual(MODULE.choose_fetch_days(end_date, 1, 7, all_dates), 1)
+        self.assertEqual(
+            MODULE.choose_fetch_days(end_date, 1, 7, all_dates - {"2026-10-24"}),
+            7,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

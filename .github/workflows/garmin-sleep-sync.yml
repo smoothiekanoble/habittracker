@@ -70,6 +70,9 @@ jobs:
           fi
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.upsert }}" = "true" ]; then
             args+=(--upsert)
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              args+=(--adaptive-lookback --lookback-days 7)
+            fi
           else
             args+=(--dry-run)
           fi

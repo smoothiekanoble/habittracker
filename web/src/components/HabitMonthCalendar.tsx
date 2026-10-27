@@ -1,5 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import {
+  getCalendarStyle,
+  type CalendarStyle,
+} from "@/components/QuickSettingsMenu";
+
 import {
   buildMonthGrid,
   formatMonthYear,
@@ -40,6 +46,15 @@ export function HabitMonthCalendar({
   interactive = false,
   onToggleDate,
 }: Props) {
+  const [calendarStyle, setCalendarStyle] = useState<CalendarStyle>("fill");
+  useEffect(() => {
+    setCalendarStyle(getCalendarStyle());
+    const update = (event: Event) =>
+      setCalendarStyle((event as CustomEvent<CalendarStyle>).detail);
+    window.addEventListener("habittracker-calendar-style", update);
+    return () =>
+      window.removeEventListener("habittracker-calendar-style", update);
+  }, []);
   const grid = buildMonthGrid(year, monthIndex, "sunday");
   const todayStr = toLocalYMD(new Date());
   const header = title ?? formatMonthYear(year, monthIndex);
@@ -57,7 +72,13 @@ export function HabitMonthCalendar({
   return (
     <div className={compact ? "py-0" : "py-0.5"}>
       {showMonthNavigation && (
-        <div className={compact ? "mb-1 flex items-center justify-between gap-1" : "flex items-center justify-between gap-1 mb-1.5"}>
+        <div
+          className={
+            compact
+              ? "mb-1 flex items-center justify-between gap-1"
+              : "flex items-center justify-between gap-1 mb-1.5"
+          }
+        >
           <button
             type="button"
             onClick={onPrevMonth}
@@ -79,19 +100,26 @@ export function HabitMonthCalendar({
           </button>
         </div>
       )}
-      <div className={compact ? "mx-auto grid w-max max-w-full grid-cols-7 gap-x-1.5 gap-y-0 text-center" : "mx-auto grid w-max max-w-full grid-cols-7 gap-x-2 gap-y-0 text-center"}>
+      <div
+        className={
+          compact
+            ? "mx-auto grid w-max max-w-full grid-cols-7 gap-x-1.5 gap-y-0 text-center"
+            : "mx-auto grid w-max max-w-full grid-cols-7 gap-x-2 gap-y-0 text-center"
+        }
+      >
         {WEEKDAY_INITIALS_SUN_FIRST.map((d, i) => (
-          <div
-            key={`${d}-${i}`}
-            className={weekdayClass}
-          >
+          <div key={`${d}-${i}`} className={weekdayClass}>
             {d}
           </div>
         ))}
         {grid.map((cell) => {
           if (!cell.inMonth || !cell.dateStr) {
             return (
-              <div key={cell.key} className={compact ? "h-6 w-7" : "h-8 w-8"} aria-hidden />
+              <div
+                key={cell.key}
+                className={compact ? "h-6 w-7" : "h-8 w-8"}
+                aria-hidden
+              />
             );
           }
           const done = completedDates.has(cell.dateStr);
@@ -105,25 +133,34 @@ export function HabitMonthCalendar({
           const isStart = startDate === cell.dateStr;
           const isEnd = endDate === cell.dateStr;
           const quiet = inactive || isFuture;
-          const canToggle = interactive && onToggleDate && !isFuture && !inactive;
+          const canToggle =
+            interactive && onToggleDate && !isFuture && !inactive;
           const dot = (
             <span
               className={[
                 "relative block shrink-0 rounded-md border transition-colors",
                 dotSizeClass,
-                isToday ? "ring-2 ring-zinc-600 ring-offset-1 ring-offset-white" : "",
+                isToday
+                  ? "ring-2 ring-zinc-600 ring-offset-1 ring-offset-white"
+                  : "",
                 canToggle ? "cursor-pointer" : "",
                 quiet ? "border-zinc-200 bg-transparent opacity-35" : "",
                 !quiet && done ? "border-transparent" : "",
                 !quiet && !done ? "border-zinc-200" : "",
-                isStart || isEnd ? "outline outline-1 outline-offset-1 outline-zinc-500/50" : "",
+                isStart || isEnd
+                  ? "outline outline-1 outline-offset-1 outline-zinc-500/50"
+                  : "",
               ].join(" ")}
               style={{
                 backgroundColor: quiet
                   ? "transparent"
-                  : done
-                    ? accentColor || "#6366f1"
-                    : `color-mix(in srgb, ${accentColor || "#6366f1"} 12%, #e4e4e7)`,
+                  : calendarStyle === "heatmap"
+                    ? done
+                      ? `color-mix(in srgb, ${accentColor || "#16a34a"} 85%, #16a34a)`
+                      : `color-mix(in srgb, ${accentColor || "#16a34a"} 20%, #e4e4e7)`
+                    : done
+                      ? accentColor || "#6366f1"
+                      : `color-mix(in srgb, ${accentColor || "#6366f1"} 12%, #e4e4e7)`,
               }}
             >
               {(isStart || isEnd) && (
@@ -134,15 +171,15 @@ export function HabitMonthCalendar({
             </span>
           );
           return (
-            <div
-              key={cell.key}
-              className={cellClass}
-            >
+            <div key={cell.key} className={cellClass}>
               {canToggle ? (
                 <button
                   type="button"
                   onClick={() => onToggleDate(cell.dateStr!)}
-                  className={[cellClass, "rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"].join(" ")}
+                  className={[
+                    cellClass,
+                    "rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1",
+                  ].join(" ")}
                   title={cell.dateStr}
                   aria-label={
                     done

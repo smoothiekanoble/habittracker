@@ -5,8 +5,12 @@ import { flushSync } from "react-dom";
 import Link from "next/link";
 import { TodayHabitRow } from "@/components/TodayHabitRow";
 import { TodayMonthBucketCalendar } from "@/components/TodayMonthBucketCalendar";
+import { QuickSettingsMenu } from "@/components/QuickSettingsMenu";
 import { toLocalYMD } from "@/lib/calendar";
-import { buildDailyCompletionMap, habitAppliesOnDate } from "@/lib/today-month-stats";
+import {
+  buildDailyCompletionMap,
+  habitAppliesOnDate,
+} from "@/lib/today-month-stats";
 import { createClient, type Habit, type HabitLog } from "@/lib/supabase";
 
 const todayDate = () => toLocalYMD(new Date());
@@ -38,34 +42,34 @@ export function TodayPage() {
   const todayStr = todayDate();
   const todayMonth = new Date();
   const isViewingCurrentMonth =
-    viewYear === todayMonth.getFullYear() && viewMonthIndex === todayMonth.getMonth();
+    viewYear === todayMonth.getFullYear() &&
+    viewMonthIndex === todayMonth.getMonth();
 
   const statsByDate = useMemo(
-    () =>
-      buildDailyCompletionMap(habits, monthLogs, viewYear, viewMonthIndex),
-    [habits, monthLogs, viewYear, viewMonthIndex]
+    () => buildDailyCompletionMap(habits, monthLogs, viewYear, viewMonthIndex),
+    [habits, monthLogs, viewYear, viewMonthIndex],
   );
 
   const habitsActiveToday = useMemo(
     () => habits.filter((h) => habitAppliesOnDate(h, todayStr)),
-    [habits, todayStr]
+    [habits, todayStr],
   );
 
   const completedIds = useMemo(() => {
     const ids = new Set(habitsActiveToday.map((h) => h.id));
     return new Set(
-      logs.filter((l) => ids.has(l.habit_id)).map((l) => l.habit_id)
+      logs.filter((l) => ids.has(l.habit_id)).map((l) => l.habit_id),
     );
   }, [logs, habitsActiveToday]);
 
   const pendingHabits = useMemo(
     () => habitsActiveToday.filter((habit) => !completedIds.has(habit.id)),
-    [habitsActiveToday, completedIds]
+    [habitsActiveToday, completedIds],
   );
 
   const completedHabits = useMemo(
     () => habitsActiveToday.filter((habit) => completedIds.has(habit.id)),
-    [habitsActiveToday, completedIds]
+    [habitsActiveToday, completedIds],
   );
 
   const load = useCallback(async () => {
@@ -160,7 +164,8 @@ export function TodayPage() {
     const today = todayDate();
     const existing = logs.find((l) => l.habit_id === habit.id);
     const updateWithTransition = (update: () => void) => {
-      const transition = (document as ViewTransitionDocument).startViewTransition;
+      const transition = (document as ViewTransitionDocument)
+        .startViewTransition;
       if (transition) {
         transition.call(document, () => flushSync(update));
       } else {
@@ -193,7 +198,9 @@ export function TodayPage() {
   }
 
   function previousCalendarMonth() {
-    setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
+    setCalendarMonth(
+      (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1),
+    );
   }
 
   function nextCalendarMonth() {
@@ -202,7 +209,8 @@ export function TodayPage() {
       const now = new Date();
       if (
         next.getFullYear() > now.getFullYear() ||
-        (next.getFullYear() === now.getFullYear() && next.getMonth() > now.getMonth())
+        (next.getFullYear() === now.getFullYear() &&
+          next.getMonth() > now.getMonth())
       ) {
         return new Date(now.getFullYear(), now.getMonth(), 1);
       }
@@ -231,8 +239,12 @@ export function TodayPage() {
             <p className="font-medium">Could not load habits</p>
             <p className="mt-1">{loadError}</p>
             <p className="mt-2 text-red-700">
-              If the table is missing, open Supabase SQL Editor and run the files in{" "}
-              <code className="bg-red-100 px-1 rounded">supabase/migrations/</code>.
+              If the table is missing, open Supabase SQL Editor and run the
+              files in{" "}
+              <code className="bg-red-100 px-1 rounded">
+                supabase/migrations/
+              </code>
+              .
             </p>
           </div>
         )}
@@ -266,13 +278,7 @@ export function TodayPage() {
                     })}
                   </p>
                 </div>
-                <Link
-                  href="/habits/new"
-                  className="p-2 rounded-full bg-zinc-200 hover:bg-zinc-300 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                  aria-label="Add habit"
-                >
-                  +
-                </Link>
+                <QuickSettingsMenu />
               </header>
             </div>
             {habits.length === 0 ? (
@@ -289,7 +295,9 @@ export function TodayPage() {
               <div className="text-center py-12 text-zinc-500 text-sm">
                 <p>No habits are active today.</p>
                 <p className="mt-2">
-                  Adjust <span className="text-zinc-600">Counts from / until</span> on the{" "}
+                  Adjust{" "}
+                  <span className="text-zinc-600">Counts from / until</span> on
+                  the{" "}
                   <Link href="/habits" className="text-indigo-600 underline">
                     Habits
                   </Link>{" "}

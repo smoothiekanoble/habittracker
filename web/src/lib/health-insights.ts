@@ -46,6 +46,11 @@ export function prettyMetric(type: string): string {
     awake_minutes: "Awake time",
     avg_sleep_hr: "Overnight heart rate",
     avg_sleep_stress: "Overnight stress",
+    resting_hr: "Resting heart rate",
+    steps: "Steps",
+    calories_burned: "Calories burned",
+    active_calories_burned: "Active calories burned",
+    daily_stress: "Daily stress",
   };
   return names[type] ?? type.replaceAll("_", " ");
 }

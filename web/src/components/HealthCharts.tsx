@@ -55,14 +55,52 @@ export function TrendChart({
     return (
       <ChartEmpty text="No measurements in this range. Try a longer range." />
     );
-  const min =
-    mode === "bars"
-      ? 0
-      : Math.min(...data, ...(target === undefined ? [] : [target]));
+  const min = Math.min(...data, ...(target === undefined ? [] : [target]));
   const max = Math.max(...data, ...(target === undefined ? [] : [target]));
-  const padding = Math.max((max - min) * 0.15, unit === "minutes" ? 30 : 1);
-  const lo = mode === "bars" ? 0 : Math.max(0, min - padding),
-    hi = max + padding;
+  const niceStep = (span: number) => {
+    const rough = span / 6;
+    const power = 10 ** Math.floor(Math.log10(Math.max(rough, 1e-9)));
+    const fraction = rough / power;
+    return (
+      (fraction <= 1
+        ? 1
+        : fraction <= 2
+          ? 2
+          : fraction <= 2.5
+            ? 2.5
+            : fraction <= 5
+              ? 5
+              : 10) * power
+    );
+  };
+  let lo: number;
+  let hi: number;
+  let yTicks: number[];
+  if (mode === "bars") {
+    lo = 0;
+    hi = Math.max(1, Math.ceil(max / niceStep(max || 1)) * niceStep(max || 1));
+    yTicks = Array.from({ length: 7 }, (_, i) => (hi * i) / 6);
+  } else if (unit === "score" && label.toLowerCase().includes("sleep score")) {
+    lo = 0;
+    hi = 100;
+    yTicks = Array.from({ length: 11 }, (_, i) => i * 10);
+  } else if (unit === "minutes") {
+    const step = 60;
+    lo = Math.max(0, Math.floor(min / step) * step);
+    hi = Math.max(lo + step * 6, Math.ceil(max / step) * step);
+    yTicks = Array.from(
+      { length: Math.floor((hi - lo) / step) + 1 },
+      (_, i) => lo + i * step,
+    );
+  } else {
+    const step = niceStep(max - min || Math.abs(max) * 0.2 || 1);
+    lo = Math.max(0, Math.floor(min / step) * step);
+    hi = Math.max(lo + step * 6, Math.ceil(max / step) * step);
+    yTicks = Array.from(
+      { length: Math.floor((hi - lo) / step) + 1 },
+      (_, i) => lo + i * step,
+    );
+  }
   const x = (i: number) => L + (i / Math.max(1, points.length - 1)) * innerW;
   const y = (value: number) => T + ((hi - value) / (hi - lo)) * innerH;
   const path = (series: Point[]) =>
@@ -117,8 +155,9 @@ export function TrendChart({
         }}
         onPointerLeave={() => setHover(null)}
       >
-        {[0, 1, 2, 3].map((tick) => {
-          const value = lo + ((hi - lo) * tick) / 3;
+        {yTicks.map((value, tick) => {
+          const showLabel =
+            tick === 0 || tick === yTicks.length - 1 || tick % 2 === 0;
           return (
             <g key={tick}>
               <line
@@ -136,9 +175,14 @@ export function TrendChart({
                 fill="#71717a"
                 fontSize="11"
               >
-                {unit === "minutes"
-                  ? `${(value / 60).toFixed(1)}h`
-                  : value.toFixed(unit === "lb" || unit === "kg" ? 1 : 0)}
+                {showLabel
+                  ? unit === "minutes"
+                    ? `${value / 60}h`
+                    : value.toLocaleString("en-US", {
+                        maximumFractionDigits:
+                          unit === "lb" || unit === "kg" ? 1 : 0,
+                      })
+                  : ""}
               </text>
             </g>
           );

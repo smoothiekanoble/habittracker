@@ -203,6 +203,72 @@ def normalize_sleep(day: date, payload: dict[str, Any], user_id: str) -> list[Da
     return rows
 
 
+def normalize_daily_wellness(client: Any, start: date, end: date, user_id: str) -> list[DailyMetric]:
+    """Fetch Garmin's daily totals and normalize the fields exposed by Connect."""
+    rows: list[DailyMetric] = []
+    requests = (
+        ("steps", lambda first, last: client.get_daily_stats(first, last, stats_type="STEPS"), ("totalSteps", "steps", "total_steps"), "steps"),
+        ("calories_burned", lambda first, last: client.get_daily_stats(first, last, stats_type="CALORIES"), ("totalKilocalories", "totalCalories", "total_kilocalories"), "kcal"),
+        ("daily_stress", lambda first, last: client.get_daily_stress_stats(first, last), ("overallStressLevel", "averageStressLevel", "avgStressLevel", "stress"), "score"),
+        ("resting_hr", lambda first, last: client.get_daily_heart_rate_stats(first, last), ("restingHeartRate", "restingHr", "resting_heart_rate"), "bpm"),
+    )
+
+    def records(value: Any):
+        if isinstance(value, list):
+            for item in value:
+                yield from records(item)
+        elif isinstance(value, dict):
+            if any(key in value for key in ("calendarDate", "date", "startDate")):
+                yield value
+            else:
+                for item in value.values():
+                    yield from records(item)
+
+    for metric_type, fetch, fields, unit in requests:
+        metric_items = []
+        cursor = start
+        while cursor <= end:
+            chunk_end = min(cursor + timedelta(days=27), end)
+            try:
+                metric_items.extend(records(fetch(cursor.isoformat(), chunk_end.isoformat())))
+            except Exception as exc:
+                print(f"Garmin {metric_type} fetch unavailable for {cursor}–{chunk_end}: {exc}", file=sys.stderr)
+            cursor = chunk_end + timedelta(days=1)
+        for item in metric_items:
+            raw_date = item.get("calendarDate", item.get("date", item.get("startDate")))
+            try:
+                day = date.fromisoformat(str(raw_date)[:10])
+            except (TypeError, ValueError):
+                continue
+            if day < start or day > end:
+                continue
+            value = first_number(item, *fields)
+            if value is None:
+                continue
+            rows.append(DailyMetric(
+                user_id=user_id,
+                metric_date=day.isoformat(),
+                metric_type=metric_type,
+                value=value,
+                unit=unit,
+                source="garmin",
+                source_detail={"provider": "garmin_connect", "endpoint": metric_type},
+            ))
+            if metric_type == "calories_burned":
+                active = first_number(item, "activeKilocalories", "activeCalories", "active_kilocalories")
+                if active is not None:
+                    rows.append(DailyMetric(
+                        user_id=user_id,
+                        metric_date=day.isoformat(),
+                        metric_type="active_calories_burned",
+                        value=active,
+                        unit="kcal",
+                        source="garmin",
+                        source_detail={"provider": "garmin_connect", "endpoint": "active_calories"},
+                    ))
+    return rows
+
+
 def rows_as_json(rows: list[DailyMetric]) -> list[dict[str, Any]]:
     return [row.__dict__ for row in rows]
 
@@ -336,6 +402,9 @@ def main() -> int:
             detail = ", ".join(present_keys) if present_keys else "no measured sleep fields"
             print(f"{day.isoformat()} no normalized sleep metrics ({detail})")
         all_rows.extend(day_rows)
+
+    requested_dates = date_window(end_date, args.days)
+    all_rows.extend(normalize_daily_wellness(client, requested_dates[0], requested_dates[-1], user_id))
 
     print(json.dumps(rows_as_json(all_rows), indent=2, sort_keys=True))
     if args.upsert:

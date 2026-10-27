@@ -19,6 +19,31 @@ SPEC.loader.exec_module(MODULE)
 
 
 class GarminNormalizationTests(unittest.TestCase):
+    def test_normalizes_daily_activity_stress_and_resting_heart_rate(self) -> None:
+        class Client:
+            def get_daily_stats(self, start, end, stats_type):
+                if stats_type == "STEPS":
+                    return [{"calendarDate": start, "totalSteps": 8421}]
+                return [{"calendarDate": start, "totalKilocalories": 2310, "activeKilocalories": 720}]
+
+            def get_daily_stress_stats(self, start, end):
+                return [{"calendarDate": start, "overallStressLevel": 27}]
+
+            def get_daily_heart_rate_stats(self, start, end):
+                return [{"calendarDate": start, "restingHeartRate": 54}]
+
+        day = MODULE.date(2026, 10, 21)
+        rows = MODULE.normalize_daily_wellness(Client(), day, day, "user-1")
+        values = {row.metric_type: row.value for row in rows}
+
+        self.assertEqual(values, {
+            "steps": 8421,
+            "calories_burned": 2310,
+            "active_calories_burned": 720,
+            "daily_stress": 27,
+            "resting_hr": 54,
+        })
+
     def test_normalizes_high_signal_sleep_metrics_to_existing_schema(self) -> None:
         payload = {
             "dailySleepDTO": {

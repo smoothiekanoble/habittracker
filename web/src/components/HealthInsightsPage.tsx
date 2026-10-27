@@ -60,8 +60,23 @@ const MODULES = [
   },
   {
     id: "heart",
-    title: "Overnight heart rate",
-    note: "Look for sustained departures from your baseline",
+    title: "Resting heart rate",
+    note: "Daily resting heart rate reported by Garmin",
+  },
+  {
+    id: "steps",
+    title: "Steps",
+    note: "Daily total from Garmin Connect",
+  },
+  {
+    id: "calories",
+    title: "Calories burned",
+    note: "Total and active energy estimates from Garmin",
+  },
+  {
+    id: "daily-stress",
+    title: "Daily stress",
+    note: "Garmin’s daily stress estimate",
   },
   {
     id: "stress",
@@ -430,7 +445,23 @@ export function InsightsDashboard({
           />
         );
       case "heart":
-        return chart("avg_sleep_hr", "#e11d48");
+        return chart("resting_hr", "#e11d48");
+      case "steps":
+        return chart("steps", "#16a34a");
+      case "calories":
+        return (
+          <>
+            {chart("calories_burned", "#ea580c")}
+            <div className="mt-6 border-t border-zinc-100 pt-5">
+              <h3 className="mb-3 text-sm font-medium text-zinc-700">
+                Active calories
+              </h3>
+              {chart("active_calories_burned", "#f97316")}
+            </div>
+          </>
+        );
+      case "daily-stress":
+        return chart("daily_stress", "#a21caf");
       case "stress":
         return chart("avg_sleep_stress", "#c026d3");
       case "relationship":

@@ -5,20 +5,34 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { HabitIcon } from "@/components/HabitIcon";
 import { HabitExpandedMonthPanel } from "@/components/HabitExpandedMonthPanel";
-import { formatMonthYear } from "@/lib/calendar";
+import { QuickSettingsMenu } from "@/components/QuickSettingsMenu";
+import { formatMonthYear, toLocalYMD } from "@/lib/calendar";
 import { createClient, type Habit } from "@/lib/supabase";
 
 export function HabitsListPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [endedOpen, setEndedOpen] = useState(false);
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
-  const [viewMonthIndex, setViewMonthIndex] = useState(() => new Date().getMonth());
+  const [viewMonthIndex, setViewMonthIndex] = useState(() =>
+    new Date().getMonth(),
+  );
   const supabase = createClient();
 
   const today = new Date();
   const isViewingCurrentMonth =
     viewYear === today.getFullYear() && viewMonthIndex === today.getMonth();
+  const todayKey = toLocalYMD(today);
+  const liveHabits = habits.filter(
+    (habit) =>
+      !habit.active_until || habit.active_until.slice(0, 10) >= todayKey,
+  );
+  const endedHabits = habits.filter(
+    (habit) => habit.active_until && habit.active_until.slice(0, 10) < todayKey,
+  );
 
   function globalPrevMonth() {
     if (viewMonthIndex === 0) {
@@ -70,6 +84,17 @@ export function HabitsListPage() {
         return;
       }
       setHabits(data ?? []);
+      setCollapsedIds(
+        new Set(
+          (data ?? [])
+            .filter(
+              (habit) =>
+                habit.active_until &&
+                habit.active_until.slice(0, 10) < toLocalYMD(new Date()),
+            )
+            .map((habit) => habit.id),
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -105,13 +130,7 @@ export function HabitsListPage() {
     <div className="max-w-md mx-auto min-h-screen px-3 py-4 pb-24 sm:px-4">
       <header className="flex items-center justify-between py-4">
         <h1 className="text-xl font-semibold">Habits</h1>
-        <Link
-          href="/habits/new"
-          className="p-2 rounded-full bg-zinc-200 hover:bg-zinc-300 min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Add habit"
-        >
-          +
-        </Link>
+        <QuickSettingsMenu />
       </header>
       {habits.length === 0 ? (
         <p className="text-zinc-500">
@@ -164,7 +183,7 @@ export function HabitsListPage() {
             </div>
           </section>
           <ul className="space-y-2">
-            {habits.map((habit) => {
+            {liveHabits.map((habit) => {
               const expanded = !collapsedIds.has(habit.id);
               const accent = habit.color || "#6366f1";
               return (
@@ -193,7 +212,10 @@ export function HabitsListPage() {
                         boxShadow: `0 8px 18px -10px ${accent}`,
                       }}
                     >
-                      <HabitIcon icon={habit.icon} className="h-[18px] w-[18px]" />
+                      <HabitIcon
+                        icon={habit.icon}
+                        className="h-[18px] w-[18px]"
+                      />
                     </span>
                     <span className="pointer-events-none min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-zinc-900">
@@ -234,6 +256,86 @@ export function HabitsListPage() {
                 </li>
               );
             })}
+            {endedHabits.length > 0 && (
+              <li className="list-none pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEndedOpen((open) => !open)}
+                  aria-expanded={endedOpen}
+                  className="flex w-full items-center justify-between border-b border-zinc-200 pb-2 text-left"
+                >
+                  <span className="text-sm font-semibold text-zinc-600">
+                    Ended habits{" "}
+                    <span className="font-normal text-zinc-400">
+                      ({endedHabits.length})
+                    </span>
+                  </span>
+                  <span className="text-zinc-400">
+                    {endedOpen ? "Hide" : "Show"}
+                  </span>
+                </button>
+              </li>
+            )}
+            {endedOpen &&
+              endedHabits.map((habit) => {
+                const expanded = !collapsedIds.has(habit.id);
+                const accent = habit.color || "#6366f1";
+                return (
+                  <li
+                    key={habit.id}
+                    className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100/70 shadow-sm opacity-85"
+                  >
+                    <button
+                      type="button"
+                      id={`habit-trigger-${habit.id}`}
+                      aria-expanded={expanded}
+                      aria-controls={`habit-panel-${habit.id}`}
+                      onClick={() => toggleRow(habit.id)}
+                      className="flex min-h-[56px] w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-white/50"
+                    >
+                      <span
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white"
+                        style={{ backgroundColor: accent }}
+                      >
+                        <HabitIcon
+                          icon={habit.icon}
+                          className="h-[18px] w-[18px]"
+                        />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-zinc-700">
+                          {habit.title}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-zinc-500">
+                          Ended {habit.active_until?.slice(0, 10)} ·{" "}
+                          {expanded ? "Hide history" : "Show history"}
+                        </span>
+                      </span>
+                      <span className="text-zinc-500">
+                        {expanded ? "⌄" : "›"}
+                      </span>
+                    </button>
+                    {expanded && (
+                      <div
+                        id={`habit-panel-${habit.id}`}
+                        role="region"
+                        aria-labelledby={`habit-trigger-${habit.id}`}
+                        className="border-t border-zinc-200 bg-white/40"
+                      >
+                        <HabitExpandedMonthPanel
+                          habitId={habit.id}
+                          accentColor={accent}
+                          activeFrom={habit.active_from}
+                          activeUntil={habit.active_until}
+                          compact
+                          viewYear={viewYear}
+                          viewMonthIndex={viewMonthIndex}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
           </ul>
         </>
       )}

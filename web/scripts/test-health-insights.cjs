@@ -111,7 +111,15 @@ for (const [props, expected] of [
   [{ rows: [], loading: true }, "Loading dashboard"],
   [{ rows: [], error: "Test request failed" }, "Test request failed"],
 ]) {
-  assert.ok(renderToStaticMarkup(React.createElement(InsightsDashboard, { ...props, onRefresh() {}, preferenceKey: null })).includes(expected));
+  assert.ok(
+    renderToStaticMarkup(
+      React.createElement(InsightsDashboard, {
+        ...props,
+        onRefresh() {},
+        preferenceKey: null,
+      }),
+    ).includes(expected),
+  );
 }
 const today = h.dateKey(new Date());
 const fixtureDates = h.calendar(h.shiftDay(today, -214), today);
@@ -127,6 +135,11 @@ const rows = fixtureDates.flatMap((date, i) => {
     awake_minutes: 12 + Math.abs(Math.sin(i)) * 25,
     avg_sleep_hr: 53 + Math.sin(i * 0.3) * 4,
     avg_sleep_stress: 19 + Math.sin(i * 0.5) * 5,
+    resting_hr: 55 + Math.sin(i * 0.3) * 4,
+    daily_stress: 28 + Math.sin(i * 0.4) * 7,
+    steps: 7000 + Math.round(Math.sin(i * 0.6) * 1800),
+    calories_burned: 2400 + Math.round(Math.sin(i * 0.7) * 350),
+    active_calories_burned: 700 + Math.round(Math.sin(i * 0.8) * 180),
     ...(i % 3 === 0
       ? {}
       : { body_weight: 181 + i * 0.015 + Math.sin(i * 0.8) * 1.2 }),
@@ -139,11 +152,15 @@ const rows = fixtureDates.flatMap((date, i) => {
     unit:
       type === "body_weight"
         ? "lb"
-        : type === "avg_sleep_hr"
+        : type.includes("hr")
           ? "bpm"
-          : type.includes("score") || type.includes("stress")
-            ? "score"
-            : "minutes",
+          : type.includes("calories")
+            ? "kcal"
+            : type === "steps"
+              ? "steps"
+              : type.includes("score") || type.includes("stress")
+                ? "score"
+                : "minutes",
     value,
     updated_at: `${date}T12:00:00Z`,
   }));
@@ -283,7 +300,12 @@ if (process.argv.includes("--browser")) {
         await page
           .getByRole("button", { name: "All history", exact: true })
           .click();
-        assert.equal(await page.getByRole("button", { name: "All history", exact: true }).getAttribute("aria-pressed"), "true");
+        assert.equal(
+          await page
+            .getByRole("button", { name: "All history", exact: true })
+            .getAttribute("aria-pressed"),
+          "true",
+        );
         assert.ok(
           (await page.locator("article").first().textContent()).includes(
             "Body weight",
@@ -295,9 +317,16 @@ if (process.argv.includes("--browser")) {
         await page
           .getByRole("button", { name: "Reset layout", exact: true })
           .click();
-        await page.getByRole("checkbox", { name: "Bar charts", exact: true }).check();
-        assert.ok(await page.locator("article").first().locator("svg rect").count() > 0);
-        await page.getByRole("checkbox", { name: "Bar charts", exact: true }).uncheck();
+        await page
+          .getByRole("checkbox", { name: "Bar charts", exact: true })
+          .check();
+        assert.ok(
+          (await page.locator("article").first().locator("svg rect").count()) >
+            0,
+        );
+        await page
+          .getByRole("checkbox", { name: "Bar charts", exact: true })
+          .uncheck();
         await page
           .getByRole("button", { name: "Done editing", exact: true })
           .click();

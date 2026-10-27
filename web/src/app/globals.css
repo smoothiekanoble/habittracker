@@ -2,6 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+html[data-theme="dark"] body {
+  background: #111315;
+  color: #e5e7eb;
+}
+html[data-theme="dark"] .bg-zinc-50 {
+  background-color: #111315;
+}
+html[data-theme="dark"] .bg-zinc-50\/95 {
+  background-color: rgb(17 19 21 / 95%);
+}
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/80 {
+  background-color: #1b1e21;
+}
+html[data-theme="dark"] .bg-zinc-100,
+html[data-theme="dark"] .bg-zinc-100\/70 {
+  background-color: #25292d;
+}
+html[data-theme="dark"] .bg-zinc-200 {
+  background-color: #343a40;
+}
+html[data-theme="dark"] .text-zinc-900,
+html[data-theme="dark"] .text-zinc-800,
+html[data-theme="dark"] .text-zinc-700 {
+  color: #e5e7eb;
+}
+html[data-theme="dark"] .text-zinc-600,
+html[data-theme="dark"] .text-zinc-500 {
+  color: #a1a1aa;
+}
+html[data-theme="dark"] .border-zinc-200,
+html[data-theme="dark"] .border-zinc-300 {
+  border-color: #3f444a;
+}
+html[data-theme="dark"] .habit-date-input {
+  background-color: #1b1e21;
+  color: #e5e7eb;
+  border-color: #52525b;
+}
+html[data-theme="dark"] .today-habit-row-complete {
+  color: #f4f4f5;
+}
+html[data-theme="dark"] li.overflow-hidden {
+  background: #1b1e21 !important;
+  border-color: #3f444a !important;
+}
+html[data-theme="dark"] .from-white {
+  --tw-gradient-from: #1b1e21 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(27 30 33 / 0%) var(--tw-gradient-to-position);
+}
+html[data-theme="dark"] .to-zinc-50\/90 {
+  --tw-gradient-to: #202428 var(--tw-gradient-to-position);
+}
+html[data-theme="dark"] .bg-zinc-100\/50,
+html[data-theme="dark"] .bg-zinc-100\/80 {
+  background-color: rgb(37 41 45 / 80%);
+}
+
 @keyframes habit-calendar-reveal {
   from {
     opacity: 0;
@@ -62,7 +120,8 @@
 }
 
 .today-habit-check-icon {
-  animation: today-habit-check-pop 0.5s cubic-bezier(0.34, 1.45, 0.64, 1) forwards;
+  animation: today-habit-check-pop 0.5s cubic-bezier(0.34, 1.45, 0.64, 1)
+    forwards;
 }
 
 @keyframes today-habit-badge-pop {
@@ -81,7 +140,12 @@
 }
 
 .today-habit-list-fade {
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18px, black 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 18px,
+    black 100%
+  );
   mask-image: linear-gradient(to bottom, transparent 0, black 18px, black 100%);
 }
 

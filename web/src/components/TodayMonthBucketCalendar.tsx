@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  buildMonthGrid,
-  WEEKDAY_INITIALS_SUN_FIRST,
-} from "@/lib/calendar";
+  getCalendarStyle,
+  type CalendarStyle,
+} from "@/components/QuickSettingsMenu";
+import { buildMonthGrid, WEEKDAY_INITIALS_SUN_FIRST } from "@/lib/calendar";
 
 export type DayCompletionStats = { completed: number; total: number };
 
@@ -31,7 +32,8 @@ function completionFillStyle(ratio: number): CSSProperties {
 
   const style: CSSProperties = {
     background: `linear-gradient(to top, hsl(${hBottom}, ${s}%, ${lightBottom}%), hsl(${h}, ${s}%, ${light}%))`,
-    transition: "height 300ms ease-out, box-shadow 280ms ease-out, background 280ms ease-out",
+    transition:
+      "height 300ms ease-out, box-shadow 280ms ease-out, background 280ms ease-out",
   };
 
   if (t >= 0.999) {
@@ -73,6 +75,15 @@ export function TodayMonthBucketCalendar({
   onThisMonth,
 }: Props) {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [calendarStyle, setCalendarStyle] = useState<CalendarStyle>("fill");
+  useEffect(() => {
+    setCalendarStyle(getCalendarStyle());
+    const update = (event: Event) =>
+      setCalendarStyle((event as CustomEvent<CalendarStyle>).detail);
+    window.addEventListener("habittracker-calendar-style", update);
+    return () =>
+      window.removeEventListener("habittracker-calendar-style", update);
+  }, []);
   const grid = buildMonthGrid(year, monthIndex, "sunday");
   const weekRows = grid.length / 7;
   const monthWord = new Date(year, monthIndex, 1).toLocaleDateString("en-US", {
@@ -85,7 +96,8 @@ export function TodayMonthBucketCalendar({
     const deltaX = x - touchStartRef.current.x;
     const deltaY = y - touchStartRef.current.y;
     touchStartRef.current = null;
-    if (Math.abs(deltaX) < 44 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+    if (Math.abs(deltaX) < 44 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25)
+      return;
     if (deltaX < 0 && canGoNext) onNextMonth?.();
     if (deltaX > 0) onPrevMonth?.();
   }
@@ -96,7 +108,8 @@ export function TodayMonthBucketCalendar({
       className="py-0 touch-pan-y"
       onTouchStart={(event) => {
         const touch = event.touches[0];
-        if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+        if (touch)
+          touchStartRef.current = { x: touch.clientX, y: touch.clientY };
       }}
       onTouchEnd={(event) => {
         const touch = event.changedTouches[0];
@@ -164,79 +177,90 @@ export function TodayMonthBucketCalendar({
         }
       >
         <div className="absolute left-1/2 top-0 grid w-max max-w-full -translate-x-1/2 grid-cols-7 gap-x-2 gap-y-0 text-center sm:gap-x-2.5 sm:gap-y-px">
-        {WEEKDAY_INITIALS_SUN_FIRST.map((d, i) => (
-          <div
-            key={`${d}-${i}`}
-            className="flex h-5 w-9 items-end justify-center text-[10px] font-medium text-zinc-500 leading-none sm:h-5 sm:w-10 sm:text-[11px]"
-          >
-            {d}
-          </div>
-        ))}
-        {grid.map((cell) => {
-          if (!cell.inMonth || !cell.dateStr) {
-            return (
-              <div key={cell.key} className="h-9 w-9 sm:h-10 sm:w-10" aria-hidden />
-            );
-          }
-
-          const dateStr = cell.dateStr;
-          const isFuture = dateStr > todayStr;
-          const isToday = dateStr === todayStr;
-          const stats = statsByDate.get(dateStr) ?? {
-            completed: 0,
-            total: 0,
-          };
-          const { completed, total } = stats;
-
-          if (isFuture) {
-            return (
-              <div key={cell.key} className={CELL}>
-                <div
-                  role="img"
-                  className="relative h-[18px] w-[18px] shrink-0 rounded-md border-2 border-dashed border-zinc-400 bg-transparent sm:h-5 sm:w-5"
-                  aria-label={`Future day, ${longDateLabel(dateStr)}`}
-                />
-              </div>
-            );
-          }
-
-          const noHabitsYet = total === 0;
-          const ratio = noHabitsYet ? 0 : completed / total;
-          const fillHeightPct = noHabitsYet ? 0 : ratio * 100;
-
-          let ariaLabel: string;
-          if (noHabitsYet) {
-            ariaLabel = `${longDateLabel(dateStr)}, no habits yet`;
-          } else {
-            const pct = Math.round(ratio * 100);
-            ariaLabel = `${longDateLabel(dateStr)}, ${completed} of ${total} habits, ${pct} percent`;
-          }
-
-          return (
-            <div key={cell.key} className={CELL} aria-label={ariaLabel}>
-              <div
-                className={[
-                  INNER,
-                  isToday
-                    ? "ring-2 ring-zinc-600 ring-offset-1 ring-offset-white"
-                    : "",
-                ].join(" ")}
-                style={{ backgroundColor: EMPTY_GRAY }}
-              >
-                {!noHabitsYet && (
-                  <div
-                    className="absolute bottom-0 left-0 right-0"
-                    style={{
-                      height: `${fillHeightPct}%`,
-                      ...completionFillStyle(ratio),
-                    }}
-                    aria-hidden
-                  />
-                )}
-              </div>
+          {WEEKDAY_INITIALS_SUN_FIRST.map((d, i) => (
+            <div
+              key={`${d}-${i}`}
+              className="flex h-5 w-9 items-end justify-center text-[10px] font-medium text-zinc-500 leading-none sm:h-5 sm:w-10 sm:text-[11px]"
+            >
+              {d}
             </div>
-          );
-        })}
+          ))}
+          {grid.map((cell) => {
+            if (!cell.inMonth || !cell.dateStr) {
+              return (
+                <div
+                  key={cell.key}
+                  className="h-9 w-9 sm:h-10 sm:w-10"
+                  aria-hidden
+                />
+              );
+            }
+
+            const dateStr = cell.dateStr;
+            const isFuture = dateStr > todayStr;
+            const isToday = dateStr === todayStr;
+            const stats = statsByDate.get(dateStr) ?? {
+              completed: 0,
+              total: 0,
+            };
+            const { completed, total } = stats;
+
+            if (isFuture) {
+              return (
+                <div key={cell.key} className={CELL}>
+                  <div
+                    role="img"
+                    className="relative h-[18px] w-[18px] shrink-0 rounded-md border-2 border-dashed border-zinc-400 bg-transparent sm:h-5 sm:w-5"
+                    aria-label={`Future day, ${longDateLabel(dateStr)}`}
+                  />
+                </div>
+              );
+            }
+
+            const noHabitsYet = total === 0;
+            const ratio = noHabitsYet ? 0 : completed / total;
+            const fillHeightPct = noHabitsYet ? 0 : ratio * 100;
+
+            let ariaLabel: string;
+            if (noHabitsYet) {
+              ariaLabel = `${longDateLabel(dateStr)}, no habits yet`;
+            } else {
+              const pct = Math.round(ratio * 100);
+              ariaLabel = `${longDateLabel(dateStr)}, ${completed} of ${total} habits, ${pct} percent`;
+            }
+
+            return (
+              <div key={cell.key} className={CELL} aria-label={ariaLabel}>
+                <div
+                  className={[
+                    INNER,
+                    isToday
+                      ? "ring-2 ring-zinc-600 ring-offset-1 ring-offset-white"
+                      : "",
+                  ].join(" ")}
+                  style={{
+                    backgroundColor:
+                      calendarStyle === "heatmap"
+                        ? noHabitsYet
+                          ? "#e4e4e7"
+                          : `hsl(142, ${Math.round(35 + ratio * 42)}%, ${Math.round(90 - ratio * 55)}%)`
+                        : EMPTY_GRAY,
+                  }}
+                >
+                  {!noHabitsYet && calendarStyle === "fill" && (
+                    <div
+                      className="absolute bottom-0 left-0 right-0"
+                      style={{
+                        height: `${fillHeightPct}%`,
+                        ...completionFillStyle(ratio),
+                      }}
+                      aria-hidden
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

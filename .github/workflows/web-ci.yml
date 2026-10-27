@@ -36,5 +36,8 @@ jobs:
       - name: Typecheck
         run: npm exec tsc -- --noEmit
 
+      - name: Test health insight calculations and rendering
+        run: npm run test:insights
+
       - name: Build
         run: npm run build

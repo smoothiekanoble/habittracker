@@ -2,18 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Tab = "today" | "habits";
+type Tab = "today" | "habits" | "insights";
 
 const tabs: Array<{ id: Tab; label: string; href: string }> = [
   { id: "today", label: "Today", href: "/" },
   { id: "habits", label: "Habits", href: "/habits" },
+  { id: "insights", label: "Insights", href: "/insights" },
 ];
 
-const swipeOrder: Tab[] = ["today", "habits"];
+const swipeOrder: Tab[] = ["today", "insights", "habits"];
 const SWIPE_THRESHOLD = 56;
 const EDGE_RESISTANCE = 0.28;
 
 function tabFromPath(pathname: string): Tab {
+  if (pathname === "/insights") return "insights";
   return pathname === "/habits" ? "habits" : "today";
 }
 
@@ -37,10 +39,12 @@ export function MainTabsShell({
   initialTab,
   today,
   habits,
+  insights,
 }: {
   initialTab: Tab;
   today: React.ReactNode;
   habits: React.ReactNode;
+  insights: React.ReactNode;
 }) {
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const trackingRef = useRef(false);
@@ -50,6 +54,7 @@ export function MainTabsShell({
   const scrollPositionsRef = useRef<Record<Tab, number>>({
     today: 0,
     habits: 0,
+    insights: 0,
   });
   const activeTabRef = useRef<Tab>(initialTab);
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -226,6 +231,9 @@ export function MainTabsShell({
         </section>
         <section className={paneClass("habits")} aria-hidden={activeTab !== "habits"}>
           {habits}
+        </section>
+        <section className={paneClass("insights")} aria-hidden={activeTab !== "insights"}>
+          {insights}
         </section>
       </div>
 

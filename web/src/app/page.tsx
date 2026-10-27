@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase-server";
 import { MainTabsShell } from "@/components/MainTabsShell";
 import { TodayPage } from "@/components/TodayPage";
 import { HabitsListPage } from "@/components/HabitsListPage";
+import { HealthInsightsPage } from "@/components/HealthInsightsPage";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -17,6 +18,7 @@ export default async function Home() {
       initialTab="today"
       today={<TodayPage />}
       habits={<HabitsListPage />}
+      insights={<HealthInsightsPage />}
     />
   );
 }

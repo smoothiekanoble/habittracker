@@ -29,7 +29,7 @@ function clampDrag(activeTab: Tab, deltaX: number): number {
   const index = swipeOrder.indexOf(activeTab);
   const atFirst = index === 0;
   const atLast = index === swipeOrder.length - 1;
-  if ((atFirst && deltaX < 0) || (atLast && deltaX > 0)) {
+  if ((atFirst && deltaX > 0) || (atLast && deltaX < 0)) {
     return deltaX * EDGE_RESISTANCE;
   }
   return deltaX;
@@ -136,12 +136,12 @@ export function MainTabsShell({
 
   function finishSwipe(deltaX: number) {
     const index = swipeOrder.indexOf(activeTabRef.current);
-    if (deltaX < -SWIPE_THRESHOLD && index > 0) {
-      switchTab(swipeOrder[index - 1]);
+    if (deltaX < -SWIPE_THRESHOLD && index < swipeOrder.length - 1) {
+      switchTab(swipeOrder[index + 1]);
       return;
     }
-    if (deltaX > SWIPE_THRESHOLD && index < swipeOrder.length - 1) {
-      switchTab(swipeOrder[index + 1]);
+    if (deltaX > SWIPE_THRESHOLD && index > 0) {
+      switchTab(swipeOrder[index - 1]);
       return;
     }
     setDragX(0);
@@ -163,7 +163,7 @@ export function MainTabsShell({
   }
 
   const activeIndex = swipeOrder.indexOf(activeTab);
-  const trackTransform = `translate3d(calc(${-activeIndex * 100}% - ${dragX}px), 0, 0)`;
+  const trackTransform = `translate3d(calc(${-activeIndex * 100}% + ${dragX}px), 0, 0)`;
   const paneClass = (tab: Tab) =>
     [
       "w-full min-w-full shrink-0 basis-full",

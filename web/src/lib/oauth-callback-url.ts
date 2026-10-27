@@ -7,10 +7,10 @@
  * uses the browser's deployed origin.
  */
 export function getOAuthCallbackUrl(): string {
+  // The login button runs in the browser, so the current origin is the most
+  // reliable target for local LAN testing and deployed previews alike.
+  if (typeof window !== "undefined") return `${window.location.origin}/auth/callback`;
+
   const fromEnv = process.env.NEXT_PUBLIC_AUTH_REDIRECT_ORIGIN?.trim().replace(/\/$/, "");
-  if (fromEnv) return `${fromEnv}/auth/callback`;
-  if (typeof window === "undefined") {
-    return "/auth/callback";
-  }
-  return `${window.location.origin}/auth/callback`;
+  return fromEnv ? `${fromEnv}/auth/callback` : "/auth/callback";
 }

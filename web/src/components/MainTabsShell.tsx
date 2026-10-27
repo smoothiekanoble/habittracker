@@ -229,11 +229,11 @@ export function MainTabsShell({
         <section className={paneClass("today")} aria-hidden={activeTab !== "today"}>
           {today}
         </section>
-        <section className={paneClass("habits")} aria-hidden={activeTab !== "habits"}>
-          {habits}
-        </section>
         <section className={paneClass("insights")} aria-hidden={activeTab !== "insights"}>
           {insights}
+        </section>
+        <section className={paneClass("habits")} aria-hidden={activeTab !== "habits"}>
+          {habits}
         </section>
       </div>
 

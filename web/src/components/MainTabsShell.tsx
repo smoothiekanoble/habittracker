@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Tab = "today" | "habits" | "insights";
 
 const tabs: Array<{ id: Tab; label: string; href: string }> = [
+  { id: "insights", label: "Insights", href: "/insights" },
   { id: "today", label: "Today", href: "/" },
   { id: "habits", label: "Habits", href: "/habits" },
-  { id: "insights", label: "Insights", href: "/insights" },
 ];
 
 const swipeOrder: Tab[] = ["insights", "today", "habits"];

@@ -10,7 +10,7 @@ const tabs: Array<{ id: Tab; label: string; href: string }> = [
   { id: "insights", label: "Insights", href: "/insights" },
 ];
 
-const swipeOrder: Tab[] = ["today", "insights", "habits"];
+const swipeOrder: Tab[] = ["insights", "today", "habits"];
 const SWIPE_THRESHOLD = 56;
 const EDGE_RESISTANCE = 0.28;
 
@@ -29,7 +29,7 @@ function clampDrag(activeTab: Tab, deltaX: number): number {
   const index = swipeOrder.indexOf(activeTab);
   const atFirst = index === 0;
   const atLast = index === swipeOrder.length - 1;
-  if ((atFirst && deltaX > 0) || (atLast && deltaX < 0)) {
+  if ((atFirst && deltaX < 0) || (atLast && deltaX > 0)) {
     return deltaX * EDGE_RESISTANCE;
   }
   return deltaX;
@@ -136,12 +136,12 @@ export function MainTabsShell({
 
   function finishSwipe(deltaX: number) {
     const index = swipeOrder.indexOf(activeTabRef.current);
-    if (deltaX < -SWIPE_THRESHOLD && index < swipeOrder.length - 1) {
-      switchTab(swipeOrder[index + 1]);
+    if (deltaX < -SWIPE_THRESHOLD && index > 0) {
+      switchTab(swipeOrder[index - 1]);
       return;
     }
-    if (deltaX > SWIPE_THRESHOLD && index > 0) {
-      switchTab(swipeOrder[index - 1]);
+    if (deltaX > SWIPE_THRESHOLD && index < swipeOrder.length - 1) {
+      switchTab(swipeOrder[index + 1]);
       return;
     }
     setDragX(0);
@@ -163,10 +163,7 @@ export function MainTabsShell({
   }
 
   const activeIndex = swipeOrder.indexOf(activeTab);
-  const isRestingOnToday = activeTab === "today" && dragX === 0 && !swiping;
-  const trackTransform = isRestingOnToday
-    ? undefined
-    : `translate3d(calc(${-activeIndex * 100}% + ${dragX}px), 0, 0)`;
+  const trackTransform = `translate3d(calc(${-activeIndex * 100}% - ${dragX}px), 0, 0)`;
   const paneClass = (tab: Tab) =>
     [
       "w-full min-w-full shrink-0 basis-full",
@@ -226,11 +223,11 @@ export function MainTabsShell({
         ].join(" ")}
         style={trackTransform ? { transform: trackTransform } : undefined}
       >
-        <section className={paneClass("today")} aria-hidden={activeTab !== "today"}>
-          {today}
-        </section>
         <section className={paneClass("insights")} aria-hidden={activeTab !== "insights"}>
           {insights}
+        </section>
+        <section className={paneClass("today")} aria-hidden={activeTab !== "today"}>
+          {today}
         </section>
         <section className={paneClass("habits")} aria-hidden={activeTab !== "habits"}>
           {habits}

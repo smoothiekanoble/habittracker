@@ -16,7 +16,9 @@ on:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    # Playwright 1.60 does not yet support the Ubuntu 26.04 image behind
+    # ubuntu-latest. Pin the browser automation job to the supported LTS image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       MEDM_EMAIL: ${{ secrets.MEDM_EMAIL }}

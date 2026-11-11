@@ -19,7 +19,7 @@ from urllib import parse, request
 
 
 GARMIN_SLEEP_ENDPOINT = (
-    "/gc-api/sleep-service/sleep/dailySleepData"
+    "/sleep-service/sleep/dailySleepData"
     "?date={date}&nonSleepBufferMinutes=60"
 )
 DEFAULT_TOKENSTORE = Path("local-data/garmin/tokens")

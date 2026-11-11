@@ -57,6 +57,27 @@ class GarminNormalizationTests(unittest.TestCase):
         self.assertEqual(payload["dailySleepDTO"]["sleepTimeSeconds"], 25200)
         self.assertEqual(client.called, ["current", "legacy"])
 
+    def test_sleep_fetch_fallback_uses_relative_sleep_service_path(self) -> None:
+        class Client:
+            def __init__(self):
+                self.endpoint = None
+
+            def get_daily_sleep(self, day):
+                return {"dailySleepDTO": {"sleepTimeSeconds": None}}
+
+            def get_sleep_data(self, day):
+                return {"dailySleepDTO": {"sleepTimeSeconds": None}}
+
+            def connectapi(self, endpoint):
+                self.endpoint = endpoint
+                return {"dailySleepDTO": {"sleepTimeSeconds": 24000}}
+
+        client = Client()
+        payload = MODULE.fetch_sleep_json(client, MODULE.date(2026, 10, 21))
+
+        self.assertEqual(client.endpoint, "/sleep-service/sleep/dailySleepData?date=2026-10-21&nonSleepBufferMinutes=60")
+        self.assertEqual(payload["dailySleepDTO"]["sleepTimeSeconds"], 24000)
+
     def test_normalizes_daily_activity_stress_and_resting_heart_rate(self) -> None:
         class Client:
             def get_daily_stats(self, start, end, stats_type):

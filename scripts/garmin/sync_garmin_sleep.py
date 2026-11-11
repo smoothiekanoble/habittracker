@@ -109,18 +109,30 @@ def ensure_garmin_client() -> Any:
 
 def fetch_sleep_json(client: Any, day: date) -> dict[str, Any]:
     day_str = day.isoformat()
-    try:
-        payload = client.get_sleep_data(day_str)
+    failures: list[str] = []
+    # Garmin Connect's Sleep page uses the sleep-service API. The older
+    # wellness-service call can return a non-empty DTO with no measurements,
+    # which must not prevent trying the current endpoint.
+    for method_name, fetch in (
+        ("get_daily_sleep", lambda: client.get_daily_sleep(day_str)),
+        ("get_sleep_data", lambda: client.get_sleep_data(day_str)),
+        (
+            "dailySleepData endpoint",
+            lambda: client.connectapi(GARMIN_SLEEP_ENDPOINT.format(date=day_str)),
+        ),
+    ):
+        try:
+            payload = fetch()
+        except Exception as exc:
+            failures.append(f"{method_name}: {exc}")
+            continue
         if isinstance(payload, dict) and payload:
-            return payload
-    except Exception as exc:
-        print(f"get_sleep_data failed for {day_str}, falling back to gc-api endpoint: {exc}", file=sys.stderr)
-
-    endpoint = GARMIN_SLEEP_ENDPOINT.format(date=day_str)
-    payload = client.connectapi(endpoint)
-    if not isinstance(payload, dict):
-        raise RuntimeError(f"Unexpected Garmin sleep payload for {day_str}: {type(payload).__name__}")
-    return payload
+            if normalize_sleep(day, payload, DRY_RUN_USER_ID):
+                return payload
+            failures.append(f"{method_name}: no measured sleep fields")
+    if failures:
+        print(f"No measured Garmin sleep payload for {day_str}: {'; '.join(failures)}", file=sys.stderr)
+    return {}
 
 
 def save_raw(day: date, payload: dict[str, Any]) -> None:
@@ -405,6 +417,12 @@ def main() -> int:
 
     requested_dates = date_window(end_date, args.days)
     all_rows.extend(normalize_daily_wellness(client, requested_dates[0], requested_dates[-1], user_id))
+
+    if args.adaptive_lookback and not all_rows:
+        raise SystemExit(
+            "Garmin returned no sleep or wellness metrics for the adaptive lookback window; "
+            "failing this run so the empty sync is visible and can be retried."
+        )
 
     print(json.dumps(rows_as_json(all_rows), indent=2, sort_keys=True))
     if args.upsert:

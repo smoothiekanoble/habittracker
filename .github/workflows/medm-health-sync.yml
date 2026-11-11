@@ -12,7 +12,8 @@ on:
         required: false
         default: "true"
   schedule:
-    - cron: "17 10 * * *"
+    # Keep the import away from the busiest top-of-hour scheduling window.
+    - cron: "47 10 * * *"
 
 jobs:
   sync:

@@ -19,6 +19,44 @@ SPEC.loader.exec_module(MODULE)
 
 
 class GarminNormalizationTests(unittest.TestCase):
+    def test_sleep_fetch_prefers_current_sleep_service_endpoint(self) -> None:
+        class Client:
+            def __init__(self):
+                self.called = []
+
+            def get_daily_sleep(self, day):
+                self.called.append(("current", day))
+                return {"dailySleepDTO": {"sleepTimeSeconds": 28800}}
+
+            def get_sleep_data(self, day):
+                self.called.append(("legacy", day))
+                return {}
+
+        client = Client()
+        payload = MODULE.fetch_sleep_json(client, MODULE.date(2026, 10, 21))
+
+        self.assertEqual(payload["dailySleepDTO"]["sleepTimeSeconds"], 28800)
+        self.assertEqual(client.called, [("current", "2026-10-21")])
+
+    def test_sleep_fetch_skips_nonempty_legacy_payload_without_measurements(self) -> None:
+        class Client:
+            def __init__(self):
+                self.called = []
+
+            def get_daily_sleep(self, day):
+                self.called.append("current")
+                return {"dailySleepDTO": {}}
+
+            def get_sleep_data(self, day):
+                self.called.append("legacy")
+                return {"dailySleepDTO": {"sleepTimeSeconds": 25200}}
+
+        client = Client()
+        payload = MODULE.fetch_sleep_json(client, MODULE.date(2026, 10, 21))
+
+        self.assertEqual(payload["dailySleepDTO"]["sleepTimeSeconds"], 25200)
+        self.assertEqual(client.called, ["current", "legacy"])
+
     def test_normalizes_daily_activity_stress_and_resting_heart_rate(self) -> None:
         class Client:
             def get_daily_stats(self, start, end, stats_type):

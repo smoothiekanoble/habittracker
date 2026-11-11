@@ -31,7 +31,9 @@ on:
   schedule:
     # Poll after the usual morning sync, then retry after delayed Garmin uploads.
     # GitHub supports IANA time zones for scheduled workflows.
-    - cron: "20 10,12 * * *"
+    - cron: "37 10 * * *"
+      timezone: "America/Chicago"
+    - cron: "43 12 * * *"
       timezone: "America/Chicago"
 
 jobs:

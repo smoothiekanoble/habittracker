@@ -129,7 +129,9 @@ def fetch_sleep_json(client: Any, day: date) -> dict[str, Any]:
         if isinstance(payload, dict) and payload:
             if normalize_sleep(day, payload, DRY_RUN_USER_ID):
                 return payload
-            failures.append(f"{method_name}: no measured sleep fields")
+            dto = payload.get("dailySleepDTO")
+            dto_keys = sorted(dto.keys()) if isinstance(dto, dict) else []
+            failures.append(f"{method_name}: no measured sleep fields; DTO keys={dto_keys}")
     if failures:
         print(f"No measured Garmin sleep payload for {day_str}: {'; '.join(failures)}", file=sys.stderr)
     return {}
@@ -167,6 +169,18 @@ def first_number(payload: dict[str, Any], *keys: str) -> float | None:
         if value is not None:
             return value
     return None
+
+
+def payload_structure(value: Any, depth: int = 0) -> Any:
+    """Describe response fields without writing personal measurements to logs."""
+    if depth >= 4:
+        return type(value).__name__
+    if isinstance(value, dict):
+        return {key: payload_structure(nested, depth + 1) for key, nested in value.items()}
+    if isinstance(value, list):
+        sample = payload_structure(value[0], depth + 1) if value else None
+        return {"type": "list", "length": len(value), "sample": sample}
+    return type(value).__name__
 
 
 def minutes_from_seconds(value: float | None) -> float | None:
@@ -242,7 +256,12 @@ def normalize_daily_wellness(client: Any, start: date, end: date, user_id: str) 
         while cursor <= end:
             chunk_end = min(cursor + timedelta(days=27), end)
             try:
-                metric_items.extend(records(fetch(cursor.isoformat(), chunk_end.isoformat())))
+                response = fetch(cursor.isoformat(), chunk_end.isoformat())
+                metric_items.extend(records(response))
+                print(
+                    f"Garmin {metric_type} response structure: {payload_structure(response)}",
+                    file=sys.stderr,
+                )
             except Exception as exc:
                 print(f"Garmin {metric_type} fetch unavailable for {cursor}–{chunk_end}: {exc}", file=sys.stderr)
             cursor = chunk_end + timedelta(days=1)
@@ -418,10 +437,10 @@ def main() -> int:
     requested_dates = date_window(end_date, args.days)
     all_rows.extend(normalize_daily_wellness(client, requested_dates[0], requested_dates[-1], user_id))
 
-    if args.adaptive_lookback and not all_rows:
+    if args.upsert and not all_rows:
         raise SystemExit(
-            "Garmin returned no sleep or wellness metrics for the adaptive lookback window; "
-            "failing this run so the empty sync is visible and can be retried."
+            "Garmin returned no sleep or wellness metrics for this sync; "
+            "failing instead of reporting a successful empty import."
         )
 
     print(json.dumps(rows_as_json(all_rows), indent=2, sort_keys=True))

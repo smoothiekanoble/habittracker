@@ -18,10 +18,7 @@ from typing import Any
 from urllib import parse, request
 
 
-GARMIN_SLEEP_ENDPOINT = (
-    "/sleep-service/sleep/dailySleepData"
-    "?date={date}&nonSleepBufferMinutes=60"
-)
+GARMIN_SLEEP_ENDPOINT = "/sleep-service/sleep/dailySleepData"
 DEFAULT_TOKENSTORE = Path("local-data/garmin/tokens")
 RAW_SLEEP_DIR = Path("local-data/garmin/raw-sleep")
 DRY_RUN_USER_ID = "00000000-0000-0000-0000-000000000000"
@@ -118,7 +115,10 @@ def fetch_sleep_json(client: Any, day: date) -> dict[str, Any]:
         ("get_sleep_data", lambda: client.get_sleep_data(day_str)),
         (
             "dailySleepData endpoint",
-            lambda: client.connectapi(GARMIN_SLEEP_ENDPOINT.format(date=day_str)),
+            lambda: client.connectapi(
+                GARMIN_SLEEP_ENDPOINT,
+                params={"date": day_str, "nonSleepBufferMinutes": 60},
+            ),
         ),
     ):
         try:

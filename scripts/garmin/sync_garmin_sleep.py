@@ -164,8 +164,25 @@ def numeric_value(value: Any) -> float | None:
 
 
 def first_number(payload: dict[str, Any], *keys: str) -> float | None:
+    def find(value: Any, key: str) -> float | None:
+        if isinstance(value, dict):
+            if key in value:
+                number = numeric_value(value[key])
+                if number is not None:
+                    return number
+            for nested in value.values():
+                number = find(nested, key)
+                if number is not None:
+                    return number
+        elif isinstance(value, list):
+            for nested in value:
+                number = find(nested, key)
+                if number is not None:
+                    return number
+        return None
+
     for key in keys:
-        value = numeric_value(payload.get(key))
+        value = find(payload, key)
         if value is not None:
             return value
     return None
@@ -236,7 +253,7 @@ def normalize_daily_wellness(client: Any, start: date, end: date, user_id: str) 
         ("steps", lambda first, last: client.get_daily_stats(first, last, stats_type="STEPS"), ("totalSteps", "steps", "total_steps"), "steps"),
         ("calories_burned", lambda first, last: client.get_daily_stats(first, last, stats_type="CALORIES"), ("totalKilocalories", "totalCalories", "total_kilocalories"), "kcal"),
         ("daily_stress", lambda first, last: client.get_daily_stress_stats(first, last), ("overallStressLevel", "averageStressLevel", "avgStressLevel", "stress"), "score"),
-        ("resting_hr", lambda first, last: client.get_daily_heart_rate_stats(first, last), ("restingHeartRate", "restingHr", "resting_heart_rate"), "bpm"),
+        ("resting_hr", lambda first, last: client.get_daily_heart_rate_stats(first, last), ("restingHeartRate", "restingHr", "resting_heart_rate", "restingHR"), "bpm"),
     )
 
     def records(value: Any):
@@ -283,10 +300,10 @@ def normalize_daily_wellness(client: Any, start: date, end: date, user_id: str) 
                     continue
                 summary_metrics = (
                     ("steps", first_number(item, "totalSteps", "steps", "total_steps"), "steps"),
-                    ("calories_burned", first_number(item, "totalKilocalories", "totalCalories", "total_kilocalories"), "kcal"),
-                    ("active_calories_burned", first_number(item, "activeKilocalories", "activeCalories", "active_kilocalories"), "kcal"),
-                    ("daily_stress", first_number(item, "averageStressLevel", "overallStressLevel", "avgStressLevel"), "score"),
-                    ("resting_hr", first_number(item, "restingHeartRate", "restingHr", "resting_heart_rate"), "bpm"),
+                    ("calories_burned", first_number(item, "totalKilocalories", "totalCalories", "total_kilocalories", "burnedTotal"), "kcal"),
+                    ("active_calories_burned", first_number(item, "activeKilocalories", "activeCalories", "active_kilocalories", "burnedActive"), "kcal"),
+                    ("daily_stress", first_number(item, "averageStressLevel", "overallStressLevel", "avgStressLevel", "avgLevel"), "score"),
+                    ("resting_hr", first_number(item, "restingHeartRate", "restingHr", "resting_heart_rate", "restingValue", "restingHR"), "bpm"),
                 )
                 for metric_type, value, unit in summary_metrics:
                     if value is not None:

@@ -24,11 +24,10 @@ class GarminNormalizationTests(unittest.TestCase):
             def get_daily_summaries(self, start, end):
                 return {"data": [{
                     "calendarDate": start,
-                    "totalSteps": 9000,
-                    "totalKilocalories": 2400,
-                    "activeKilocalories": 800,
-                    "averageStressLevel": 31,
-                    "restingHeartRate": 55,
+                    "movement": {"steps": {"totalSteps": 9000}},
+                    "calories": {"burnedTotal": 2400, "burnedActive": 800},
+                    "stress": {"avgLevel": 31},
+                    "heartRate": {"restingValue": 55},
                     "sleepingSeconds": 27000,
                 }]}
 
@@ -111,14 +110,14 @@ class GarminNormalizationTests(unittest.TestCase):
         class Client:
             def get_daily_stats(self, start, end, stats_type):
                 if stats_type == "STEPS":
-                    return [{"calendarDate": start, "totalSteps": 8421}]
-                return [{"calendarDate": start, "totalKilocalories": 2310, "activeKilocalories": 720}]
+                    return {"values": [{"calendarDate": start, "values": {"totalSteps": 8421}}]}
+                return {"values": [{"calendarDate": start, "values": {"totalKilocalories": 2310, "activeKilocalories": 720}}]}
 
             def get_daily_stress_stats(self, start, end):
-                return [{"calendarDate": start, "overallStressLevel": 27}]
+                return [{"calendarDate": start, "values": {"overallStressLevel": 27}}]
 
             def get_daily_heart_rate_stats(self, start, end):
-                return [{"calendarDate": start, "restingHeartRate": 54}]
+                return [{"calendarDate": start, "values": {"restingHR": 54}}]
 
         day = MODULE.date(2026, 10, 21)
         rows = MODULE.normalize_daily_wellness(Client(), day, day, "user-1")

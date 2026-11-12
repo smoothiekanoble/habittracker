@@ -250,6 +250,55 @@ def normalize_daily_wellness(client: Any, start: date, end: date, user_id: str) 
                 for item in value.values():
                     yield from records(item)
 
+    def day_for(item: dict[str, Any]) -> date | None:
+        raw_date = item.get("calendarDate", item.get("date", item.get("startDate")))
+        try:
+            day = date.fromisoformat(str(raw_date)[:10])
+        except (TypeError, ValueError):
+            return None
+        return day if start <= day <= end else None
+
+    def add_metric(day: date, metric_type: str, value: float, unit: str, endpoint: str) -> None:
+        rows.append(DailyMetric(
+            user_id=user_id,
+            metric_date=day.isoformat(),
+            metric_type=metric_type,
+            value=value,
+            unit=unit,
+            source="garmin",
+            source_detail={"provider": "garmin_connect", "endpoint": endpoint},
+        ))
+
+    summary_keys: set[tuple[str, str]] = set()
+    if hasattr(client, "get_daily_summaries"):
+        try:
+            summary = client.get_daily_summaries(start.isoformat(), end.isoformat())
+            print(
+                f"Garmin daily summaries response structure: {payload_structure(summary)}",
+                file=sys.stderr,
+            )
+            for item in records(summary):
+                day = day_for(item)
+                if day is None:
+                    continue
+                summary_metrics = (
+                    ("steps", first_number(item, "totalSteps", "steps", "total_steps"), "steps"),
+                    ("calories_burned", first_number(item, "totalKilocalories", "totalCalories", "total_kilocalories"), "kcal"),
+                    ("active_calories_burned", first_number(item, "activeKilocalories", "activeCalories", "active_kilocalories"), "kcal"),
+                    ("daily_stress", first_number(item, "averageStressLevel", "overallStressLevel", "avgStressLevel"), "score"),
+                    ("resting_hr", first_number(item, "restingHeartRate", "restingHr", "resting_heart_rate"), "bpm"),
+                )
+                for metric_type, value, unit in summary_metrics:
+                    if value is not None:
+                        add_metric(day, metric_type, value, unit, "daily_summaries")
+                        summary_keys.add((day.isoformat(), metric_type))
+                sleeping_minutes = minutes_from_seconds(first_number(item, "sleepingSeconds"))
+                if sleeping_minutes is not None:
+                    add_metric(day, "sleep_minutes", sleeping_minutes, "minutes", "daily_summaries")
+                    summary_keys.add((day.isoformat(), "sleep_minutes"))
+        except Exception as exc:
+            print(f"Garmin daily summaries fetch unavailable for {start}–{end}: {exc}", file=sys.stderr)
+
     for metric_type, fetch, fields, unit in requests:
         metric_items = []
         cursor = start
@@ -266,37 +315,18 @@ def normalize_daily_wellness(client: Any, start: date, end: date, user_id: str) 
                 print(f"Garmin {metric_type} fetch unavailable for {cursor}–{chunk_end}: {exc}", file=sys.stderr)
             cursor = chunk_end + timedelta(days=1)
         for item in metric_items:
-            raw_date = item.get("calendarDate", item.get("date", item.get("startDate")))
-            try:
-                day = date.fromisoformat(str(raw_date)[:10])
-            except (TypeError, ValueError):
-                continue
-            if day < start or day > end:
+            day = day_for(item)
+            if day is None:
                 continue
             value = first_number(item, *fields)
             if value is None:
                 continue
-            rows.append(DailyMetric(
-                user_id=user_id,
-                metric_date=day.isoformat(),
-                metric_type=metric_type,
-                value=value,
-                unit=unit,
-                source="garmin",
-                source_detail={"provider": "garmin_connect", "endpoint": metric_type},
-            ))
+            if (day.isoformat(), metric_type) not in summary_keys:
+                add_metric(day, metric_type, value, unit, metric_type)
             if metric_type == "calories_burned":
                 active = first_number(item, "activeKilocalories", "activeCalories", "active_kilocalories")
-                if active is not None:
-                    rows.append(DailyMetric(
-                        user_id=user_id,
-                        metric_date=day.isoformat(),
-                        metric_type="active_calories_burned",
-                        value=active,
-                        unit="kcal",
-                        source="garmin",
-                        source_detail={"provider": "garmin_connect", "endpoint": "active_calories"},
-                    ))
+                if active is not None and (day.isoformat(), "active_calories_burned") not in summary_keys:
+                    add_metric(day, "active_calories_burned", active, "kcal", "active_calories")
     return rows
 
 

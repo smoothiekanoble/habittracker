@@ -19,6 +19,32 @@ SPEC.loader.exec_module(MODULE)
 
 
 class GarminNormalizationTests(unittest.TestCase):
+    def test_normalizes_garmin_daily_summary_rows(self) -> None:
+        class Client:
+            def get_daily_summaries(self, start, end):
+                return {"data": [{
+                    "calendarDate": start,
+                    "totalSteps": 9000,
+                    "totalKilocalories": 2400,
+                    "activeKilocalories": 800,
+                    "averageStressLevel": 31,
+                    "restingHeartRate": 55,
+                    "sleepingSeconds": 27000,
+                }]}
+
+        day = MODULE.date(2026, 10, 21)
+        rows = MODULE.normalize_daily_wellness(Client(), day, day, "user-1")
+        values = {row.metric_type: row.value for row in rows}
+
+        self.assertEqual(values, {
+            "steps": 9000,
+            "calories_burned": 2400,
+            "active_calories_burned": 800,
+            "daily_stress": 31,
+            "resting_hr": 55,
+            "sleep_minutes": 450,
+        })
+
     def test_sleep_fetch_prefers_current_sleep_service_endpoint(self) -> None:
         class Client:
             def __init__(self):
